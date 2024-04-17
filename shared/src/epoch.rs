@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Epoch(u64);
 
 impl From<u64> for Epoch {

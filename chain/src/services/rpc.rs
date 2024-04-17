@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Context};
-use namada_sdk::{queries::RPC, rpc};
-use shared::{epoch::Epoch, height::BlockHeight};
+use namada_sdk::queries::RPC;
+use namada_sdk::rpc;
+use shared::epoch::Epoch;
+use shared::height::BlockHeight;
 use tendermint_rpc::HttpClient;
 
 pub async fn is_block_committed(

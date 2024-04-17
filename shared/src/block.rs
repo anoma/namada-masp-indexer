@@ -1,11 +1,15 @@
 use std::fmt::Display;
 
-use crate::{block_results::Event, epoch::Epoch, header::BlockHeader, height::BlockHeight, id::Id, transaction::Transaction};
-use tendermint_rpc::{
-    endpoint::block::Response as TendermintBlock,
-    endpoint::block_results::Response as TendermintBlockResultResponse, Client, HttpClient,
-};
+use tendermint_rpc::endpoint::block::Response as TendermintBlock;
+use tendermint_rpc::endpoint::block_results::Response as TendermintBlockResultResponse;
+use tendermint_rpc::{Client, HttpClient};
 
+use crate::block_results::Event;
+use crate::epoch::Epoch;
+use crate::header::BlockHeader;
+use crate::height::BlockHeight;
+use crate::id::Id;
+use crate::transaction::Transaction;
 
 #[derive(Debug, Clone, Default)]
 pub struct Block {
@@ -19,9 +23,14 @@ impl From<TendermintBlock> for Block {
         Block {
             hash: Id::from(value.block_id.hash),
             header: BlockHeader::from(value.block.header),
-            transactions: value.block.data.iter().filter_map(|tx_bytes| {
-                Transaction::try_from(tx_bytes.as_ref()).ok()
-            }).collect()
+            transactions: value
+                .block
+                .data
+                .iter()
+                .filter_map(|tx_bytes| {
+                    Transaction::try_from(tx_bytes.as_ref()).ok()
+                })
+                .collect(),
         }
     }
 }

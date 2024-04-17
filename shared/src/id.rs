@@ -2,10 +2,9 @@ use std::fmt::Display;
 
 use namada_core::hash::Hash as NamadaHash;
 use serde::{Deserialize, Serialize};
-use tendermint::{
-    account::Id as TendermintAccountId, block::Id as TendermintBlockId,
-    AppHash as TendermintAppHash, Hash as TendermintHash,
-};
+use tendermint::account::Id as TendermintAccountId;
+use tendermint::block::Id as TendermintBlockId;
+use tendermint::{AppHash as TendermintAppHash, Hash as TendermintHash};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Id {

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use tendermint::block::Height;
 use namada_core::storage::BlockHeight as NamadaBlockHeight;
+use tendermint::block::Height;
 
 #[derive(Debug, Clone, Default, Copy)]
 pub struct BlockHeight(pub u64);

@@ -1,12 +1,13 @@
 use std::fmt::Display;
 
-use crate::{
-    block_results::{TxAttributes, TxEventStatusCode},
-    id::Id,
-};
+use namada_core::borsh::BorshDeserialize;
 use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
-use namada_tx::{data::TxType, Section, Tx as NamadaTx};
+use namada_core::token::Transfer as NamadaMaspTransfer;
+use namada_tx::data::TxType;
+use namada_tx::Tx as NamadaTx;
 
+use crate::block_results::{TxAttributes, TxEventStatusCode};
+use crate::id::Id;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionExitStatus {
     Applied,
@@ -31,10 +32,15 @@ impl TransactionExitStatus {
     }
 }
 
+pub enum MaspTxType {
+    Normal(NamadaMaspTransaction),
+    IBC(Vec<u8>),
+}
+
 #[derive(Debug, Clone)]
 pub struct Transaction {
     pub hash: Id,
-    pub masp_tx: NamadaMaspTransaction,
+    pub masp_tx: MaspTxType,
     pub fee_unshielding_tx: Option<NamadaMaspTransaction>,
     pub memo: Option<Vec<u8>>,
 }
@@ -43,32 +49,36 @@ impl TryFrom<&[u8]> for Transaction {
     type Error = String;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let transaction =
-            NamadaTx::try_from(value).map_err(|e| e.to_string())?;
+        let tx = NamadaTx::try_from(value).map_err(|e| e.to_string())?;
 
         let fee_unshielding_tx =
-            if let TxType::Wrapper(wrapper_tx) = transaction.header().tx_type {
+            if let TxType::Wrapper(wrapper_tx) = tx.header().tx_type {
                 wrapper_tx.unshield_section_hash.and_then(|hash| {
-                    transaction
-                        .get_section(&hash)
-                        .and_then(|section| section.masp_tx())
+                    tx.get_section(&hash).and_then(|section| section.masp_tx())
                 })
             } else {
                 None
             };
 
+        let tx_data = tx
+            .data()
+            .ok_or_else(|| "MASP tx requires data.".to_string())?;
+
+        let masp_tx = match NamadaMaspTransfer::try_from_slice(&tx_data) {
+            Ok(transfer) => transfer
+                .shielded
+                .map(|hash| tx.get_section(&hash).and_then(|s| s.masp_tx()))
+                .flatten()
+                .map(MaspTxType::Normal)
+                .ok_or_else("Not a MASP tx".to_string())?,
+            Err(_) => MaspTxType::IBC(tx_data),
+        };
+
         Ok(Self {
-            hash: Id::from(transaction.header_hash()),
-            memo: transaction.memo(),
-            fee_unshielding_tx: fee_unshielding_tx,
-            masp_tx: transaction
-                .sections
-                .into_iter()
-                .find_map(|section| match section {
-                    Section::MaspTx(masp) => Some(masp),
-                    _ => None,
-                })
-                .ok_or_else(|| "Not a masp transaction")?,
+            hash: Id::from(tx.header_hash()),
+            memo: tx.memo(),
+            fee_unshielding_tx,
+            masp_tx,
         })
     }
 }

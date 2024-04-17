@@ -1,8 +1,11 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::collections::BTreeMap;
+use std::str::FromStr;
+
 use tendermint::abci::Event as TendermintEvent;
 use tendermint_rpc::endpoint::block_results::Response as TendermintBlockResultResponse;
 
-use crate::{id::Id, tx_result::TxResult};
+use crate::id::Id;
+use crate::tx_result::TxResult;
 
 #[derive(Debug, Clone)]
 pub enum EventKind {
@@ -34,6 +37,12 @@ pub struct BlockResult {
 pub struct Event {
     pub kind: EventKind,
     pub attributes: TxAttributes,
+}
+
+impl Event {
+    pub fn get_tx_result(&self) -> Option<&TxResult> {
+        self.attributes.inner_tx.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, Default, Copy)]
