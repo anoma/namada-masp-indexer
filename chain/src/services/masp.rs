@@ -1,50 +1,56 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 use namada_core::masp_primitives::ff::PrimeField;
-use namada_core::masp_primitives::merkle_tree::{
-    CommitmentTree, IncrementalWitness,
-};
 use namada_core::masp_primitives::sapling::Node;
 use namada_core::token::Transfer as NamadaMaspTransfer;
+use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
 use shared::block_results::{BlockResult, Event};
 use shared::extracted_masp_tx::ExtractedMaspTx;
 use shared::indexed_tx::IndexedTx;
 use shared::transaction::{MaspTxType, Transaction};
 use shared::tx_index::TxIndex;
 
+use crate::entity::commitment_tree::CommitmentTree;
+use crate::entity::tx_note_map::TxNoteMap;
+use crate::entity::witness_map::WitnessMap;
+
 /// Update the merkle tree of witnesses the first time we
 /// scan a new MASP transaction.
 pub fn update_witness_map(
-    commitment_tree: &mut CommitmentTree<Node>,
-    tx_note_map: &mut BTreeMap<IndexedTx, usize>,
-    witness_map: &mut HashMap<usize, IncrementalWitness<Node>>,
+    commitment_tree: CommitmentTree,
+    tx_note_map: TxNoteMap,
+    witness_map: WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> Result<(), String> {
     let mut note_pos = commitment_tree.size();
     tx_note_map.insert(indexed_tx, note_pos);
+
     for so in shielded
         .sapling_bundle()
         .map_or(&vec![], |x| &x.shielded_outputs)
     {
         // Create merkle tree leaf node from note commitment
         let node = Node::new(so.cmu.to_repr());
+
         // Update each merkle tree in the witness map with the latest
         // addition
-        for (_, witness) in witness_map.iter_mut() {
-            witness
-                .append(node)
-                .map_err(|()| "note commitment tree is full".to_string())?;
-        }
+        witness_map
+            .update(node)
+            .map_err(|()| "note commitment tree is full".to_string())?;
+
         commitment_tree
             .append(node)
             .map_err(|()| "note commitment tree is full".to_string())?;
+
         // Finally, make it easier to construct merkle paths to this new
         // note
-        let witness = IncrementalWitness::<Node>::from_tree(&commitment_tree);
+        let witness =
+            IncrementalWitness::<Node>::from_tree(&commitment_tree.get_tree());
         witness_map.insert(note_pos, witness);
         note_pos += 1;
     }
+
     Ok(())
 }
 
@@ -78,10 +84,10 @@ async fn get_indexed_masp_events_at_height(
 }
 
 /// Extract the relevant shield portions of a [`Tx`], if any.
-pub async fn extract_masp_tx(
+pub fn extract_masp_tx(
     tx: &Transaction,
     tx_event: &Event,
-) -> Option<(ExtractedMaspTx, String)> {
+) -> Result<ExtractedMaspTx, String> {
     // We use the changed keys instead of the Transfer object
     // because those are what the masp validity predicate works on
     let (wrapper_changed_keys, changed_keys) =
@@ -92,30 +98,23 @@ pub async fn extract_masp_tx(
             None => (Default::default(), Default::default()),
         };
 
-    let maybe_fee_unshield =
-        if let Some(unshield_fee_tx) = &tx.fee_unshielding_tx {
-            Some((wrapper_changed_keys, unshield_fee_tx))
-        } else {
-            None
-        };
+    let maybe_fee_unshield = tx
+        .fee_unshielding_tx
+        .as_ref()
+        .map(|unshield_fee_tx| (wrapper_changed_keys, unshield_fee_tx.clone()));
 
     let maybe_masp_tx = match &tx.masp_tx {
         MaspTxType::Normal(tx) => Some((changed_keys, tx.clone())),
-        MaspTxType::IBC(tx_data) => extract_payload_from_shielded_action(
-            &tx_data, tx_event,
+        MaspTxType::IBC(tx) => extract_payload_from_shielded_action(
+            tx.data().unwrap().as_ref(),
+            tx_event,
         )
         .and_then(|(s, t)| {
             if let Some(hash) = t.shielded {
-                let masp_tx = tx
-                    .get_section(&hash)
-                    .ok_or_else(|| {
-                        "Missing masp section in transaction".to_string()
-                    })?
-                    .masp_tx()
-                    .ok_or_else(|| "Missing masp transaction".to_string())?;
-                Ok::<_, String>((changed_keys, masp_tx))
+                let masp_tx = tx.get_section(&hash)?.masp_tx()?;
+                Some((changed_keys, masp_tx))
             } else {
-                Ok(None)
+                None
             }
         }),
     };
@@ -132,34 +131,27 @@ fn extract_payload_from_shielded_action(
     tx_event: &Event,
 ) -> Option<(BTreeSet<String>, NamadaMaspTransfer)> {
     use namada_core::ibc::IbcMessage;
-    let message =
-        namada_ibc::decode_message(tx_data).map_err(|e| e.to_string())?;
+    let message = namada_ibc::decode_message(tx_data).ok()?;
 
     let result = match message {
         IbcMessage::Transfer(msg) => {
             let tx_result = tx_event.get_tx_result()?;
 
-            let transfer = msg.transfer.ok_or_else(|| {
-                "Missing masp tx in the ibc message".to_string()
-            })?;
+            let transfer = msg.transfer?;
 
             (tx_result.changed_keys.clone(), transfer)
         }
         IbcMessage::NftTransfer(msg) => {
             let tx_result = tx_event.get_tx_result()?;
 
-            let transfer = msg.transfer.ok_or_else(|| {
-                "Missing masp tx in the ibc message".to_string()
-            })?;
+            let transfer = msg.transfer?;
 
             (tx_result.changed_keys.clone(), transfer)
         }
         IbcMessage::RecvPacket(msg) => {
             let tx_result = tx_event.get_tx_result()?;
 
-            let transfer = msg.transfer.ok_or_else(|| {
-                "Missing masp tx in the ibc message".to_string()
-            })?;
+            let transfer = msg.transfer?;
 
             (tx_result.changed_keys.clone(), transfer)
         }
@@ -167,9 +159,7 @@ fn extract_payload_from_shielded_action(
             // Refund tokens by the ack message
             let tx_result = tx_event.get_tx_result()?;
 
-            let transfer = msg.transfer.ok_or_else(|| {
-                "Missing masp tx in the ibc message".to_string()
-            })?;
+            let transfer = msg.transfer?;
 
             (tx_result.changed_keys.clone(), transfer)
         }
@@ -177,9 +167,7 @@ fn extract_payload_from_shielded_action(
             // Refund tokens by the timeout message
             let tx_result = tx_event.get_tx_result()?;
 
-            let transfer = msg.transfer.ok_or_else(|| {
-                "Missing masp tx in the ibc message".to_string()
-            })?;
+            let transfer = msg.transfer?;
 
             (tx_result.changed_keys.clone(), transfer)
         }

@@ -1,13 +1,9 @@
 use std::fmt::Display;
 
 use tendermint_rpc::endpoint::block::Response as TendermintBlock;
-use tendermint_rpc::endpoint::block_results::Response as TendermintBlockResultResponse;
-use tendermint_rpc::{Client, HttpClient};
+use tendermint_rpc::Client;
 
-use crate::block_results::Event;
-use crate::epoch::Epoch;
 use crate::header::BlockHeader;
-use crate::height::BlockHeight;
 use crate::id::Id;
 use crate::transaction::Transaction;
 

@@ -1,17 +1,15 @@
 pub mod config;
+pub mod entity;
 pub mod result;
 pub mod services;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
 
 use clap::Parser;
 use clap_verbosity_flag::LevelFilter;
-use namada_core::masp_primitives::merkle_tree::{
-    CommitmentTree, IncrementalWitness,
-};
-use namada_core::masp_primitives::sapling::Node;
+use entity::commitment_tree::CommitmentTree;
 use result::MainError;
 use shared::extracted_masp_tx::ExtractedMaspTx;
 use shared::height::BlockHeight;
@@ -25,6 +23,8 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 use crate::config::AppConfig;
+use crate::entity::tx_note_map::TxNoteMap;
+use crate::entity::witness_map::WitnessMap;
 use crate::result::AsRpcError;
 use crate::services::masp::{extract_masp_tx, update_witness_map};
 use crate::services::{cometbft as cometbft_service, rpc as rpc_service};
@@ -57,9 +57,10 @@ async fn main() -> Result<(), MainError> {
 
     // TODO: Load up from persistence
     let last_block_height = 0;
-    let mut witness_map = HashMap::<usize, IncrementalWitness<Node>>::default();
-    let mut commitment_tree = CommitmentTree::<Node>::empty();
-    let mut tx_note_map = BTreeMap::<IndexedTx, usize>::default();
+
+    let commitment_tree = CommitmentTree::default();
+    let witness_map = WitnessMap::default();
+    let tx_note_map = TxNoteMap::default();
 
     for block_height in last_block_height.. {
         if must_exit(&exit_handle) {
@@ -68,106 +69,119 @@ async fn main() -> Result<(), MainError> {
 
         _ = RetryIf::spawn(
             retry_strategy.clone(),
-            || async {
-                let block_height = BlockHeight::from(block_height);
+            || {
+                let client = client.clone();
+                let witness_map = witness_map.clone();
+                let commitment_tree = commitment_tree.clone();
+                let tx_note_map = tx_note_map.clone();
 
-                tracing::info!(
-                    "Attempting to process block: {}...",
-                    block_height
-                );
+                async move {
+                    let block_height = BlockHeight::from(block_height);
 
-                if !rpc_service::is_block_committed(&client, &block_height)
-                    .await
-                    .into_rpc_error()?
-                {
-                    tracing::warn!(
-                        "Block {} was not processed, retrying...",
+                    tracing::info!(
+                        "Attempting to process block: {}...",
                         block_height
                     );
-                    return Err(MainError::Rpc);
-                }
 
-                tracing::info!("Querying epoch...");
-
-                let tm_block_response_fut = async {
-                    tracing::info!("Downloading new block...");
-                    let tm_block_response =
-                        cometbft_service::query_raw_block_at_height(
-                            &client,
-                            block_height,
-                        )
+                    if !rpc_service::is_block_committed(&client, &block_height)
                         .await
-                        .into_rpc_error()?;
-                    tracing::info!("Raw block downloaded!");
-                    result::ok(tm_block_response)
-                };
+                        .into_rpc_error()?
+                    {
+                        tracing::warn!(
+                            "Block {} was not processed, retrying...",
+                            block_height
+                        );
+                        return Err(MainError::Rpc);
+                    }
 
-                let tm_block_results_response_fut = async {
-                    tracing::info!("Query block results...");
-                    let tm_block_results_response =
+                    tracing::info!("Querying epoch...");
+
+                    let tm_block_response_fut = async {
+                        tracing::info!("Downloading new block...");
+                        let tm_block_response =
+                            cometbft_service::query_raw_block_at_height(
+                                &client,
+                                block_height,
+                            )
+                            .await
+                            .into_rpc_error()?;
+                        tracing::info!("Raw block downloaded!");
+                        result::ok(tm_block_response)
+                    };
+
+                    let tm_block_results_response_fut = async {
+                        tracing::info!("Query block results...");
+                        let tm_block_results_response =
                         cometbft_service::query_raw_block_results_at_height(
                             &client,
                             block_height,
                         )
                         .await
                         .into_rpc_error()?;
-                    tracing::info!("Block result downloaded!");
-                    result::ok(tm_block_results_response)
-                };
+                        tracing::info!("Block result downloaded!");
+                        result::ok(tm_block_results_response)
+                    };
 
-                let (tm_block_response, tm_block_results_response) = futures::try_join!(
-                    tm_block_response_fut,
-                    tm_block_results_response_fut,
-                )?;
-                let mut shielded_txs = BTreeMap::new();
-                let height = tm_block_response.header.height;
-                for (idx, tx_event) in tm_block_results_response
-                    .end_events
-                    .into_iter()
-                    .filter_map(|event| {
-                        event
-                            .attributes
-                            .is_valid_masp_tx
-                            .map(|ix| (ix as usize, event))
-                    })
-                {
-                    let tx = &tm_block_response.transactions[idx];
-                    let ExtractedMaspTx {
-                        fee_unshielding,
-                        inner_tx,
-                    } = extract_masp_tx(tx, &tx_event);
-                    fee_unshielding.and_then(|(_, masp_transaction)| {
-                        let indexed_tx = IndexedTx {
-                            height,
-                            index: TxIndex(idx as u32),
-                            is_fee_unshielding: true,
-                        };
-                        update_witness_map(
-                            &mut commitment_tree,
-                            &mut tx_note_map,
-                            &mut witness_map,
-                            indexed_tx,
-                            &masp_transaction,
-                        )?;
-                        shielded_txs.insert(indexed_tx, masp_transaction)
-                    });
-                    inner_tx.and_then(|(_, masp_transaction)| {
-                        let indexed_tx = IndexedTx {
-                            height,
-                            index: TxIndex(idx as u32),
-                            is_fee_unshielding: true,
-                        };
-                        update_witness_map(
-                            &mut commitment_tree,
-                            &mut tx_note_map,
-                            &mut witness_map,
-                            indexed_tx,
-                            &masp_transaction,
-                        )?;
-                        shielded_txs.insert(indexed_tx, masp_transaction)
-                    });
+                    let (tm_block_response, tm_block_results_response) = futures::try_join!(
+                        tm_block_response_fut,
+                        tm_block_results_response_fut,
+                    )?;
+
+                    let mut shielded_txs = BTreeMap::new();
+
+                    let height = tm_block_response.header.height;
+                    for (idx, tx_event) in tm_block_results_response
+                        .end_events
+                        .into_iter()
+                        .filter_map(|event| {
+                            event
+                                .attributes
+                                .is_valid_masp_tx
+                                .map(|ix| (ix as usize, event))
+                        })
+                    {
+                        let tx = &tm_block_response.transactions[idx];
+                        let ExtractedMaspTx {
+                            fee_unshielding,
+                            inner_tx,
+                        } = extract_masp_tx(tx, &tx_event)
+                            .map_err(MainError::Masp)?;
+
+                        if let Some((_, masp_transaction)) = fee_unshielding {
+                            let indexed_tx = IndexedTx {
+                                height,
+                                index: TxIndex(idx as u32),
+                                is_fee_unshielding: true,
+                            };
+                            update_witness_map(
+                                commitment_tree.clone(),
+                                tx_note_map.clone(),
+                                witness_map.clone(),
+                                indexed_tx,
+                                &masp_transaction,
+                            )
+                            .map_err(MainError::Masp)?;
+                            shielded_txs.insert(indexed_tx, masp_transaction);
+                        }
+                        //     if let Some((_, masp_transaction)) = inner_tx {
+                        //         let indexed_tx = IndexedTx {
+                        //             height,
+                        //             index: TxIndex(idx as u32),
+                        //             is_fee_unshielding: true,
+                        //         };
+                        //         update_witness_map(
+                        //             &mut commitment_tree,
+                        //             &mut tx_note_map,
+                        //             &mut witness_map,
+                        //             indexed_tx,
+                        //             &masp_transaction,
+                        //         )
+                        //         .map_err(MainError::Masp)?;
+                        //         shielded_txs.insert(indexed_tx,
+                        // masp_transaction);     }
+                    }
+                    Ok(())
                 }
-                Ok(())
             },
             |_: &MainError| !must_exit(&exit_handle),
         )

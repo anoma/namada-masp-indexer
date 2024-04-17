@@ -32,9 +32,10 @@ impl TransactionExitStatus {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum MaspTxType {
     Normal(NamadaMaspTransaction),
-    IBC(Vec<u8>),
+    IBC(NamadaTx),
 }
 
 #[derive(Debug, Clone)]
@@ -67,11 +68,12 @@ impl TryFrom<&[u8]> for Transaction {
         let masp_tx = match NamadaMaspTransfer::try_from_slice(&tx_data) {
             Ok(transfer) => transfer
                 .shielded
-                .map(|hash| tx.get_section(&hash).and_then(|s| s.masp_tx()))
-                .flatten()
+                .and_then(|hash| {
+                    tx.get_section(&hash).and_then(|s| s.masp_tx())
+                })
                 .map(MaspTxType::Normal)
-                .ok_or_else("Not a MASP tx".to_string())?,
-            Err(_) => MaspTxType::IBC(tx_data),
+                .ok_or_else(|| "Not a MASP tx".to_string())?,
+            Err(_) => MaspTxType::IBC(tx.clone()),
         };
 
         Ok(Self {

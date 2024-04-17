@@ -3,7 +3,7 @@ use std::fmt::Display;
 use namada_core::storage::BlockHeight as NamadaBlockHeight;
 use tendermint::block::Height;
 
-#[derive(Debug, Clone, Default, Copy)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BlockHeight(pub u64);
 
 impl From<u64> for BlockHeight {

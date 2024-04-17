@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum MainError {
+    #[error("Masp error: {0}")]
+    Masp(String),
     #[error("Tokio error")]
     Tokio,
     #[error("RPC error")]

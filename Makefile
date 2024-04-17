@@ -7,3 +7,6 @@ clippy:
 
 fmt:
 	$(cargo) +$(nightly) fmt --all
+
+clippy-fix:
+	$(cargo) +$(nightly) clippy --fix --allow-dirty --allow-staged
