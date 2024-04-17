@@ -10,3 +10,6 @@ fmt:
 
 clippy-fix:
 	$(cargo) +$(nightly) clippy --fix --allow-dirty --allow-staged
+
+check:
+	$(cargo) check

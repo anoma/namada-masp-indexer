@@ -4,11 +4,10 @@ use namada_core::masp_primitives::ff::PrimeField;
 use namada_core::masp_primitives::sapling::Node;
 use namada_core::token::Transfer as NamadaMaspTransfer;
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
-use shared::block_results::{BlockResult, Event};
+use shared::block_results::Event;
 use shared::extracted_masp_tx::ExtractedMaspTx;
 use shared::indexed_tx::IndexedTx;
 use shared::transaction::{MaspTxType, Transaction};
-use shared::tx_index::TxIndex;
 
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_note_map::TxNoteMap;
@@ -52,35 +51,6 @@ pub fn update_witness_map(
     }
 
     Ok(())
-}
-
-/// Retrieves all the indexes and tx events at the specified height which refer
-/// to a valid masp transaction. If an index is given, it filters only the
-/// transactions with an index equal or greater to the provided one.
-async fn get_indexed_masp_events_at_height(
-    block_results: BlockResult,
-    first_idx_to_query: TxIndex,
-) -> Vec<(TxIndex, Event)> {
-    block_results
-        .end_events
-        .into_iter()
-        .filter_map(|event| {
-            let tx_index = event
-                .attributes
-                .is_valid_masp_tx
-                .map(|index| TxIndex(index as u32));
-            match tx_index {
-                Some(idx) => {
-                    if idx.0 >= first_idx_to_query.0 {
-                        Some((idx, event))
-                    } else {
-                        None
-                    }
-                }
-                None => None,
-            }
-        })
-        .collect::<Vec<_>>()
 }
 
 /// Extract the relevant shield portions of a [`Tx`], if any.

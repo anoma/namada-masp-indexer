@@ -1,3 +1,4 @@
+pub mod appstate;
 pub mod config;
 pub mod entity;
 pub mod result;
@@ -22,12 +23,16 @@ use tokio_retry::RetryIf;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
+use crate::appstate::AppState;
 use crate::config::AppConfig;
+use crate::entity::chain_state::ChainState;
 use crate::entity::tx_note_map::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::result::AsRpcError;
+use crate::result::{AsDbError, AsRpcError};
 use crate::services::masp::{extract_masp_tx, update_witness_map};
-use crate::services::{cometbft as cometbft_service, rpc as rpc_service};
+use crate::services::{
+    cometbft as cometbft_service, db as db_service, rpc as rpc_service,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
@@ -55,14 +60,19 @@ async fn main() -> Result<(), MainError> {
     let retry_strategy = FixedInterval::from_millis(5000).map(jitter);
     let exit_handle = must_exit_handle();
 
-    // TODO: Load up from persistence
-    let last_block_height = 0;
+    let app_state = AppState::new(config.database_url).into_db_error()?;
+
+    let last_block_height = db_service::get_last_synched_block(
+        app_state.get_db_connection().await.into_db_error()?,
+    )
+    .await
+    .into_db_error()?;
 
     let commitment_tree = CommitmentTree::default();
     let witness_map = WitnessMap::default();
     let tx_note_map = TxNoteMap::default();
 
-    for block_height in last_block_height.. {
+    for block_height in last_block_height.0.. {
         if must_exit(&exit_handle) {
             break;
         }
@@ -74,6 +84,7 @@ async fn main() -> Result<(), MainError> {
                 let witness_map = witness_map.clone();
                 let commitment_tree = commitment_tree.clone();
                 let tx_note_map = tx_note_map.clone();
+                let app_state = app_state.clone();
 
                 async move {
                     let block_height = BlockHeight::from(block_height);
@@ -128,8 +139,8 @@ async fn main() -> Result<(), MainError> {
                     )?;
 
                     let mut shielded_txs = BTreeMap::new();
-
                     let height = tm_block_response.header.height;
+
                     for (idx, tx_event) in tm_block_results_response
                         .end_events
                         .into_iter()
@@ -153,6 +164,7 @@ async fn main() -> Result<(), MainError> {
                                 index: TxIndex(idx as u32),
                                 is_fee_unshielding: true,
                             };
+
                             update_witness_map(
                                 commitment_tree.clone(),
                                 tx_note_map.clone(),
@@ -161,25 +173,53 @@ async fn main() -> Result<(), MainError> {
                                 &masp_transaction,
                             )
                             .map_err(MainError::Masp)?;
+
                             shielded_txs.insert(indexed_tx, masp_transaction);
                         }
-                        //     if let Some((_, masp_transaction)) = inner_tx {
-                        //         let indexed_tx = IndexedTx {
-                        //             height,
-                        //             index: TxIndex(idx as u32),
-                        //             is_fee_unshielding: true,
-                        //         };
-                        //         update_witness_map(
-                        //             &mut commitment_tree,
-                        //             &mut tx_note_map,
-                        //             &mut witness_map,
-                        //             indexed_tx,
-                        //             &masp_transaction,
-                        //         )
-                        //         .map_err(MainError::Masp)?;
-                        //         shielded_txs.insert(indexed_tx,
-                        // masp_transaction);     }
+                        if let Some((_, masp_transaction)) = inner_tx {
+                            let indexed_tx = IndexedTx {
+                                height,
+                                index: TxIndex(idx as u32),
+                                is_fee_unshielding: true,
+                            };
+
+                            update_witness_map(
+                                commitment_tree.clone(),
+                                tx_note_map.clone(),
+                                witness_map.clone(),
+                                indexed_tx,
+                                &masp_transaction,
+                            )
+                            .map_err(MainError::Masp)?;
+
+                            shielded_txs.insert(indexed_tx, masp_transaction);
+                        }
+
+                        let chain_state = ChainState::new(block_height);
+
+                        let conn_obj = app_state
+                            .clone()
+                            .get_db_connection()
+                            .await
+                            .into_db_error()?;
+
+                        db_service::commit(
+                            conn_obj,
+                            chain_state,
+                            commitment_tree.clone(),
+                            witness_map.clone(),
+                            tx_note_map.clone(),
+                            shielded_txs.clone(),
+                        )
+                        .await
+                        .into_db_error()?;
+
+                        tracing::info!(
+                            "Done committing block {}!",
+                            block_height
+                        );
                     }
+
                     Ok(())
                 }
             },

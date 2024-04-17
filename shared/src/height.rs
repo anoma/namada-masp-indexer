@@ -12,6 +12,12 @@ impl From<u64> for BlockHeight {
     }
 }
 
+impl From<i32> for BlockHeight {
+    fn from(value: i32) -> Self {
+        Self(value as u64)
+    }
+}
+
 impl From<BlockHeight> for Height {
     fn from(value: BlockHeight) -> Self {
         Height::from(value.0 as u32) // safe dont touch
