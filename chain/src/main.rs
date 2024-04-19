@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use clap::Parser;
 use clap_verbosity_flag::LevelFilter;
-use entity::commitment_tree::CommitmentTree;
 use result::MainError;
 use shared::extracted_masp_tx::ExtractedMaspTx;
 use shared::height::BlockHeight;
@@ -27,7 +26,6 @@ use crate::appstate::AppState;
 use crate::config::AppConfig;
 use crate::entity::chain_state::ChainState;
 use crate::entity::tx_note_map::TxNoteMap;
-use crate::entity::witness_map::WitnessMap;
 use crate::result::{AsDbError, AsRpcError};
 use crate::services::masp::{extract_masp_tx, update_witness_map};
 use crate::services::{
@@ -68,8 +66,21 @@ async fn main() -> Result<(), MainError> {
     .await
     .into_db_error()?;
 
-    let commitment_tree = CommitmentTree::default();
-    let witness_map = WitnessMap::default();
+    let commitment_tree = db_service::get_last_commitment_tree(
+        app_state.get_db_connection().await.into_db_error()?,
+        last_block_height,
+    )
+    .await
+    .into_db_error()?
+    .unwrap_or_default();
+
+    let witness_map = db_service::get_last_witness_map(
+        app_state.get_db_connection().await.into_db_error()?,
+        last_block_height,
+    )
+    .await
+    .into_db_error()?;
+
     let tx_note_map = TxNoteMap::default();
 
     for block_height in last_block_height.0.. {
@@ -224,7 +235,7 @@ async fn main() -> Result<(), MainError> {
                 }
             },
             |_: &MainError| !must_exit(&exit_handle),
-        )
+        ).await
     }
 
     Ok(())

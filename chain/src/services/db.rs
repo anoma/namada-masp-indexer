@@ -1,16 +1,20 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use deadpool_diesel::postgres::Object;
 use diesel::dsl::max;
-use diesel::{QueryDsl, RunQueryDsl};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use diesel_migrations::{
     embed_migrations, EmbeddedMigrations, MigrationHarness,
 };
-use namada_sdk::borsh::BorshSerializeExt;
+use namada_sdk::borsh::{BorshDeserialize, BorshSerializeExt};
+use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
+use namada_sdk::masp_primitives::sapling::Node;
 use namada_sdk::masp_primitives::transaction::Transaction;
-use orm::schema::{self, chain_state};
+use orm::schema::{self, chain_state, commitment_tree, witness};
+use orm::tree::TreeDb;
 use orm::tx::TxInsertDb;
+use orm::witness::WitnessDb;
 use shared::height::BlockHeight;
 use shared::indexed_tx::IndexedTx;
 
@@ -52,6 +56,63 @@ pub async fn get_last_synched_block(
     Ok(block_height
         .map(BlockHeight::from)
         .unwrap_or_else(|| BlockHeight::from(0)))
+}
+
+pub async fn get_last_commitment_tree(
+    conn: Object,
+    height: BlockHeight,
+) -> anyhow::Result<Option<CommitmentTree>> {
+    let tree = conn
+        .interact(move |conn| {
+            commitment_tree::dsl::commitment_tree
+                .filter(commitment_tree::dsl::block_height.eq(height.0 as i32))
+                .select(TreeDb::as_select())
+                .first(conn)
+        })
+        .await
+        .context_db_interact_error()
+        .context("Failed to read block max height in db")?
+        .ok();
+
+    if let Some(tree) = tree {
+        if let Ok(tree) = CommitmentTree::try_from(tree) {
+            Ok(Some(tree))
+        } else {
+            Err(anyhow!("Can't deserialize commitment tree"))
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+pub async fn get_last_witness_map(
+    conn: Object,
+    height: BlockHeight,
+) -> anyhow::Result<WitnessMap> {
+    let witnesses: Vec<WitnessDb> = conn
+        .interact(move |conn| {
+            witness::dsl::witness
+                .filter(witness::dsl::block_height.eq(height.0 as i32))
+                .select(WitnessDb::as_select())
+                .get_results(conn)
+                .unwrap_or_default()
+        })
+        .await
+        .context_db_interact_error()
+        .context("Failed to read block max height in db")?;
+
+    let witnesses = witnesses
+        .into_iter()
+        .try_fold(HashMap::new(), |mut acc, witness| {
+            let witness_node = IncrementalWitness::<Node>::try_from_slice(
+                &witness.witness_bytes,
+            )?;
+            acc.insert(witness.witness_idx as usize, witness_node);
+            Ok::<_, std::io::Error>(acc)
+        })
+        .unwrap_or_default();
+
+    Ok(WitnessMap::new(witnesses))
 }
 
 #[allow(clippy::too_many_arguments)]
