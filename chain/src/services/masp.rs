@@ -79,7 +79,7 @@ pub fn extract_masp_tx(
             tx.data().unwrap().as_ref(),
             tx_event,
         )
-        .and_then(|(s, t)| {
+        .and_then(|(_s, t)| {
             if let Some(hash) = t.shielded {
                 let masp_tx = tx.get_section(&hash)?.masp_tx()?;
                 Some((changed_keys, masp_tx))

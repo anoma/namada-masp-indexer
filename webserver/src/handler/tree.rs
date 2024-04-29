@@ -1,5 +1,4 @@
 use axum::extract::{Query, State};
-use axum::http::HeaderMap;
 use axum::Json;
 use axum_macros::debug_handler;
 use axum_trace_id::TraceId;
@@ -11,8 +10,7 @@ use crate::state::common::CommonState;
 
 #[debug_handler]
 pub async fn get_commitment_tree(
-    trace_id: TraceId<String>,
-    headers: HeaderMap,
+    _trace_id: TraceId<String>,
     State(state): State<CommonState>,
     Query(query_params): Query<TreeQueryParams>,
 ) -> Result<Json<TreeResponse>, TreeError> {

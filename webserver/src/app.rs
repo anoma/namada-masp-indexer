@@ -35,12 +35,6 @@ impl ApplicationServer {
 
         let app_state = AppState::new(db_url)?;
 
-        // /api/v1/tree?height=<optional>
-
-        // /api/v1/witness?height=<mandatory>&index=<>&size=<>
-
-        // /api/v1/notes-map?height=<mandatory>&size<>
-
         // /api/v1/txs?from=<10>size=<1>
 
         let routes = {
@@ -51,6 +45,11 @@ impl ApplicationServer {
                     "/commitment-tree",
                     get(handler::tree::get_commitment_tree),
                 )
+                .route(
+                    "/witness-map",
+                    get(handler::witness_map::get_witness_map),
+                )
+                .route("/notes-map", get(handler::notes_map::get_notes_map))
                 .with_state(common_state)
         };
 
