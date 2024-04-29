@@ -14,7 +14,7 @@ paths:
     get:
       parameters:
         - in: query
-          name: block_height
+          name: height
           schema:
             type: integer
       responses:
@@ -28,13 +28,15 @@ paths:
     get:
       parameters:
         - in: query
-          name: from-height
-          required: true
+          name: height
           schema:
             type: integer
         - in: query
-          name: to-height
-          required: true
+          name: from
+          schema:
+            type: integer
+        - in: query
+          name: size
           schema:
             type: integer
       responses:
@@ -43,12 +45,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TreeResponse'
+                $ref: '#/components/schemas/NotesMapResponse'
   /witness-map:
     get:
       parameters:
         - in: query
-          name: block_height
+          name: height
+          schema:
+            type: integer
+        - in: query
+          name: from
+          schema:
+            type: integer
+        - in: query
+          name: size
           schema:
             type: integer
       responses:
@@ -62,12 +72,12 @@ paths:
     get:
       parameters:
         - in: query
-          name: from-height
+          name: height
           required: true
           schema:
             type: integer
         - in: query
-          name: to-height
+          name: size
           required: true
           schema:
             type: integer
@@ -77,7 +87,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TreeResponse'
+                $ref: '#/components/schemas/TxResponse'
 
 components:
   schemas:
@@ -110,3 +120,43 @@ components:
         block_height:
           type: integer
           description: The block height of the commitment tree
+    NotesMapResponse:
+      type: object
+      properties:
+        witnesses:
+          type: array
+          items:
+            type: object
+            properties:
+              note_positon:
+                type: integer
+                description: The note position.
+              index:
+                type: integer
+                description: The note index.
+              is_fee_unshielding:
+                type: boolean
+                description: If this is s fee unshielded.
+              block_height:
+                type: integer
+                description: The note block height.
+          description: The vector of notes map
+    TxResponse:
+      type: object
+      properties:
+        witnesses:
+          type: array
+          items:
+            type: object
+            properties:
+              bytes:
+                type: string
+                format: byte
+                description: The masp transaction bytes.
+              index:
+                type: integer
+                description: The note index.
+              block_height:
+                type: integer
+                description: The note block height.
+          description: The vector of masp transactions

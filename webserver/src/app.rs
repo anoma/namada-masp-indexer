@@ -50,6 +50,7 @@ impl ApplicationServer {
                     get(handler::witness_map::get_witness_map),
                 )
                 .route("/notes-map", get(handler::notes_map::get_notes_map))
+                .route("/tx", get(handler::tx::get_tx))
                 .with_state(common_state)
         };
 
