@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    command: -c 'max_connections=200'
+    ports:
+      - 5435:5432
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+      PGUSER: postgres
+      POSTGRES_DB: indexer_local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "indexer_local"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 80s
+  
+  webserver:
+    image: namada-masp-webserver
+    build:
+      context: .
+      dockerfile: webserver/Dockerfile
+    ports:
+      - 5000:5000
+    environment:
+      CARGO_ENV: development
+      PORT: 5000
+      DATABASE_URL: postgres://postgres:password@postgres:5432/indexer_local
+    depends_on:
+      - crawler
+  
+  crawler:
+    image: namada-masp-crawler
+    build:
+      context: .
+      dockerfile: chain/Dockerfile
+    environment:
+      CARGO_ENV: development
+      TENDERMINT_URL: <>
+      CHECKSUMS_FILEPATH: <>
+      CHAIN_ID: <>
+      DATABASE_URL: postgres://postgres:password@postgres:5432/indexer_local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
