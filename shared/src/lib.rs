@@ -8,4 +8,3 @@ pub mod id;
 pub mod indexed_tx;
 pub mod transaction;
 pub mod tx_index;
-pub mod tx_result;

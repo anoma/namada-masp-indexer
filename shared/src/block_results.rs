@@ -1,26 +1,22 @@
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
-use tendermint::abci::Event as TendermintEvent;
+use namada_tx::data::TxResult;
 use tendermint_rpc::endpoint::block_results::Response as TendermintBlockResultResponse;
 
 use crate::id::Id;
-use crate::tx_result::TxResult;
+use crate::transaction::TransactionExitStatus;
 
 #[derive(Debug, Clone)]
 pub enum EventKind {
     Applied,
-    Rejected,
-    Accepted,
     Unknown,
 }
 
 impl From<&String> for EventKind {
     fn from(value: &String) -> Self {
         match value.as_str() {
-            "applied" => Self::Applied,
-            "accepted" => Self::Accepted,
-            "rejected" => Self::Rejected,
+            "tx/applied" => Self::Applied,
             _ => Self::Unknown,
         }
     }
@@ -36,13 +32,7 @@ pub struct BlockResult {
 #[derive(Debug, Clone)]
 pub struct Event {
     pub kind: EventKind,
-    pub attributes: TxAttributes,
-}
-
-impl Event {
-    pub fn get_tx_result(&self) -> Option<&TxResult> {
-        self.attributes.inner_tx.as_ref()
-    }
+    pub attributes: Option<TxAttributes>,
 }
 
 #[derive(Debug, Clone, Default, Copy)]
@@ -68,24 +58,76 @@ impl From<&str> for TxEventStatusCode {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct BatchResults {
+    pub batch_errors: BTreeMap<Id, BTreeMap<Id, String>>,
+    pub batch_results: BTreeMap<Id, bool>,
+}
+
+impl BatchResults {
+    pub fn is_successful(&self, tx_id: &Id) -> bool {
+        match self.batch_results.get(tx_id) {
+            Some(result) => *result,
+            None => false,
+        }
+    }
+}
+
+impl From<TxResult<String>> for BatchResults {
+    fn from(value: TxResult<String>) -> Self {
+        Self {
+            batch_results: value.batch_results.0.iter().fold(
+                BTreeMap::default(),
+                |mut acc, (tx_hash, result)| {
+                    let tx_id = Id::from(*tx_hash);
+                    let result = if let Ok(result) = result {
+                        result.is_accepted()
+                    } else {
+                        false
+                    };
+                    acc.insert(tx_id, result);
+                    acc
+                },
+            ),
+            batch_errors: value.batch_results.0.into_iter().fold(
+                BTreeMap::default(),
+                |mut acc, (tx_hash, result)| {
+                    let tx_id = Id::from(tx_hash);
+                    let result = if let Ok(result) = result {
+                        result
+                            .vps_result
+                            .errors
+                            .into_iter()
+                            .map(|(address, error)| (Id::from(address), error))
+                            .collect()
+                    } else {
+                        BTreeMap::default()
+                    };
+                    acc.insert(tx_id, result);
+                    acc
+                },
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct TxAttributes {
     pub code: TxEventStatusCode,
     pub gas: u64,
     pub hash: Id,
     pub height: u64,
+    pub batch: BatchResults,
     pub info: String,
-    pub is_valid_masp_tx: Option<u64>,
-    pub inner_tx: Option<TxResult>,
 }
 
 impl TxAttributes {
     pub fn deserialize(
         event_kind: &EventKind,
         attributes: &BTreeMap<String, String>,
-    ) -> Self {
+    ) -> Option<Self> {
         match event_kind {
-            EventKind::Unknown => Self::default(),
-            _ => Self {
+            EventKind::Unknown => None,
+            EventKind::Applied => Some(Self {
                 code: attributes
                     .get("code")
                     .map(|code| TxEventStatusCode::from(code.as_str()))
@@ -106,30 +148,17 @@ impl TxAttributes {
                     .map(|height| u64::from_str(height).unwrap())
                     .unwrap()
                     .to_owned(),
+                batch: attributes
+                    .get("batch")
+                    .map(|batch_result| {
+                        let tx_result: TxResult<String> =
+                            serde_json::from_str(batch_result).unwrap();
+                        BatchResults::from(tx_result)
+                    })
+                    .unwrap(),
                 info: attributes.get("info").unwrap().to_owned(),
-                is_valid_masp_tx: attributes
-                    .get("is_valid_masp_tx")
-                    .and_then(|b| b.parse::<u64>().ok()),
-                inner_tx: attributes
-                    .get("inner_tx")
-                    .and_then(|key| TxResult::from_str(key).ok()),
-            },
+            }),
         }
-    }
-}
-
-impl From<TendermintEvent> for Event {
-    fn from(value: TendermintEvent) -> Self {
-        let kind = EventKind::from(&value.kind);
-        let raw_attributes = value.attributes.iter().fold(
-            BTreeMap::default(),
-            |mut acc, attribute| {
-                acc.insert(attribute.key.clone(), attribute.value.clone());
-                acc
-            },
-        );
-        let attributes = TxAttributes::deserialize(&kind, &raw_attributes);
-        Event { kind, attributes }
     }
 }
 
@@ -145,8 +174,8 @@ impl From<TendermintBlockResultResponse> for BlockResult {
                     BTreeMap::default(),
                     |mut acc, attribute| {
                         acc.insert(
-                            attribute.key.clone(),
-                            attribute.value.clone(),
+                            String::from(attribute.key_str().unwrap()),
+                            String::from(attribute.value_str().unwrap()),
                         );
                         acc
                     },
@@ -166,8 +195,8 @@ impl From<TendermintBlockResultResponse> for BlockResult {
                     BTreeMap::default(),
                     |mut acc, attribute| {
                         acc.insert(
-                            attribute.key.clone(),
-                            attribute.value.clone(),
+                            String::from(attribute.key_str().unwrap()),
+                            String::from(attribute.value_str().unwrap()),
                         );
                         acc
                     },
@@ -192,10 +221,33 @@ impl From<&TendermintBlockResultResponse> for BlockResult {
 }
 
 impl BlockResult {
-    pub fn find_tx_hash_result(&self, tx_hash: &Id) -> Option<TxAttributes> {
-        self.end_events
+    pub fn is_wrapper_tx_applied(&self, tx_hash: &Id) -> TransactionExitStatus {
+        let exit_status = self
+            .end_events
             .iter()
-            .find(|event| event.attributes.hash.eq(tx_hash))
-            .map(|event| event.attributes.clone())
+            .filter_map(|event| event.attributes.clone())
+            .find(|attributes| attributes.hash.eq(tx_hash))
+            .map(|attributes| attributes.clone().code)
+            .map(TransactionExitStatus::from);
+
+        exit_status.unwrap_or(TransactionExitStatus::Rejected)
+    }
+
+    pub fn is_inner_tx_accepted(
+        &self,
+        wrapper_hash: &Id,
+        inner_hash: &Id,
+    ) -> TransactionExitStatus {
+        let exit_status = self
+            .end_events
+            .iter()
+            .filter_map(|event| event.attributes.clone())
+            .find(|attributes| attributes.hash.eq(wrapper_hash))
+            .map(|attributes| attributes.batch.is_successful(inner_hash))
+            .map(|successful| match successful {
+                true => TransactionExitStatus::Applied,
+                false => TransactionExitStatus::Rejected,
+            });
+        exit_status.unwrap_or(TransactionExitStatus::Rejected)
     }
 }

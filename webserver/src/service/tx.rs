@@ -1,6 +1,6 @@
 use crate::appstate::AppState;
 use crate::repository::notes_map::{
-    NotesMapRepository, NotesMapRepositoryTrait,
+    NotesMapRepositoryTrait,
 };
 use crate::repository::tx::{TxRepository, TxRepositoryTrait};
 

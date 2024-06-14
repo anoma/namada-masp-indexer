@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use shared::height::BlockHeight;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct TxResponse {

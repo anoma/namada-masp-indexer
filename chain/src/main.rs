@@ -11,7 +11,6 @@ use std::sync::Arc;
 use clap::Parser;
 use clap_verbosity_flag::LevelFilter;
 use result::MainError;
-use shared::extracted_masp_tx::ExtractedMaspTx;
 use shared::height::BlockHeight;
 use shared::indexed_tx::IndexedTx;
 use shared::tx_index::TxIndex;
@@ -27,7 +26,7 @@ use crate::config::AppConfig;
 use crate::entity::chain_state::ChainState;
 use crate::entity::tx_note_map::TxNoteMap;
 use crate::result::{AsDbError, AsRpcError};
-use crate::services::masp::{extract_masp_tx, update_witness_map};
+use crate::services::masp::update_witness_map;
 use crate::services::{
     cometbft as cometbft_service, db as db_service, rpc as rpc_service,
 };
@@ -131,45 +130,18 @@ async fn main() -> Result<(), MainError> {
                         result::ok(tm_block_response)
                     };
 
-                    let tm_block_results_response_fut = async {
-                        tracing::info!("Query block results...");
-                        let tm_block_results_response =
-                        cometbft_service::query_raw_block_results_at_height(
-                            &client,
-                            block_height,
-                        )
-                        .await
-                        .into_rpc_error()?;
-                        tracing::info!("Block result downloaded!");
-                        result::ok(tm_block_results_response)
-                    };
-
-                    let (tm_block_response, tm_block_results_response) = futures::try_join!(
-                        tm_block_response_fut,
-                        tm_block_results_response_fut,
-                    )?;
+                    let tm_block_response = tm_block_response_fut.await?;
 
                     let mut shielded_txs = BTreeMap::new();
                     let height = tm_block_response.header.height;
 
-                    for (idx, tx_event) in tm_block_results_response
-                        .end_events
-                        .into_iter()
-                        .filter_map(|event| {
-                            event
-                                .attributes
-                                .is_valid_masp_tx
-                                .map(|ix| (ix as usize, event))
-                        })
+                    for (idx, batch_tx) in
+                        tm_block_response.transactions.into_iter().enumerate()
                     {
-                        let tx = &tm_block_response.transactions[idx];
-                        let ExtractedMaspTx {
-                            fee_unshielding,
-                            inner_tx,
-                        } = extract_masp_tx(tx, &tx_event)
-                            .map_err(MainError::Masp)?;
+                        for (masp_tx, _memo) in batch_tx.masp_tx {
+                            // TODO: handle fee unshielding
 
-                        if let Some((_, masp_transaction)) = fee_unshielding {
+                            let inner_tx = masp_tx.0;
                             let indexed_tx = IndexedTx {
                                 height,
                                 index: TxIndex(idx as u32),
@@ -181,29 +153,11 @@ async fn main() -> Result<(), MainError> {
                                 tx_note_map.clone(),
                                 witness_map.clone(),
                                 indexed_tx,
-                                &masp_transaction,
+                                &inner_tx,
                             )
                             .map_err(MainError::Masp)?;
 
-                            shielded_txs.insert(indexed_tx, masp_transaction);
-                        }
-                        if let Some((_, masp_transaction)) = inner_tx {
-                            let indexed_tx = IndexedTx {
-                                height,
-                                index: TxIndex(idx as u32),
-                                is_fee_unshielding: true,
-                            };
-
-                            update_witness_map(
-                                commitment_tree.clone(),
-                                tx_note_map.clone(),
-                                witness_map.clone(),
-                                indexed_tx,
-                                &masp_transaction,
-                            )
-                            .map_err(MainError::Masp)?;
-
-                            shielded_txs.insert(indexed_tx, masp_transaction);
+                            shielded_txs.insert(indexed_tx, inner_tx);
                         }
 
                         let chain_state = ChainState::new(block_height);
@@ -235,7 +189,8 @@ async fn main() -> Result<(), MainError> {
                 }
             },
             |_: &MainError| !must_exit(&exit_handle),
-        ).await
+        )
+        .await
     }
 
     Ok(())
