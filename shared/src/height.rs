@@ -6,6 +6,12 @@ use tendermint::block::Height;
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BlockHeight(pub u64);
 
+impl BlockHeight {
+    pub fn next(&self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
 impl From<u64> for BlockHeight {
     fn from(value: u64) -> Self {
         Self(value)

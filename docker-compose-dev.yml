@@ -10,9 +10,9 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_USER: postgres
       PGUSER: postgres
-      POSTGRES_DB: indexer_local
+      POSTGRES_DB: masp-indexer
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-d", "indexer_local"]
+      test: ["CMD-SHELL", "pg_isready", "-d", "masp-indexer"]
       interval: 5s
       timeout: 10s
       retries: 5

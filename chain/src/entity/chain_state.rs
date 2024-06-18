@@ -1,6 +1,7 @@
 use orm::chain_state::ChainStateteInsertDb;
 use shared::height::BlockHeight;
 
+#[derive(Clone, Copy, Debug)]
 pub struct ChainState {
     pub block_height: BlockHeight,
 }

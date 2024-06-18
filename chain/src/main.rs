@@ -63,7 +63,9 @@ async fn main() -> Result<(), MainError> {
         app_state.get_db_connection().await.into_db_error()?,
     )
     .await
-    .into_db_error()?;
+    .into_db_error()?
+    .unwrap_or_default()
+    .next();
 
     let commitment_tree = db_service::get_last_commitment_tree(
         app_state.get_db_connection().await.into_db_error()?,
@@ -80,8 +82,6 @@ async fn main() -> Result<(), MainError> {
     .await
     .into_db_error()?;
 
-    let tx_note_map = TxNoteMap::default();
-
     for block_height in last_block_height.0.. {
         if must_exit(&exit_handle) {
             break;
@@ -93,11 +93,18 @@ async fn main() -> Result<(), MainError> {
                 let client = client.clone();
                 let witness_map = witness_map.clone();
                 let commitment_tree = commitment_tree.clone();
-                let tx_note_map = tx_note_map.clone();
+                let tx_note_map = TxNoteMap::default();
                 let app_state = app_state.clone();
 
                 async move {
+                    let conn_obj = app_state
+                        .clone()
+                        .get_db_connection()
+                        .await
+                        .into_db_error()?;
+
                     let block_height = BlockHeight::from(block_height);
+                    let chain_state = ChainState::new(block_height);
 
                     tracing::info!(
                         "Attempting to process block: {}...",
@@ -115,18 +122,15 @@ async fn main() -> Result<(), MainError> {
                         return Err(MainError::Rpc);
                     }
 
-                    tracing::info!("Querying epoch...");
-
                     let tm_block_response_fut = async {
                         tracing::info!("Downloading new block...");
-                        let tm_block_response =
-                            cometbft_service::query_raw_block_at_height(
-                                &client,
-                                block_height,
-                            )
-                            .await
-                            .into_rpc_error()?;
-                        tracing::info!("Raw block downloaded!");
+                        let tm_block_response = cometbft_service::query_block(
+                            &client,
+                            block_height,
+                        )
+                        .await
+                        .into_rpc_error()?;
+                        tracing::info!("Block downloaded!");
                         result::ok(tm_block_response)
                     };
 
@@ -134,6 +138,11 @@ async fn main() -> Result<(), MainError> {
 
                     let mut shielded_txs = BTreeMap::new();
                     let height = tm_block_response.header.height;
+
+                    tracing::info!(
+                        "Processing {} transactions...",
+                        tm_block_response.transactions.len()
+                    );
 
                     for (idx, batch_tx) in
                         tm_block_response.transactions.into_iter().enumerate()
@@ -145,7 +154,7 @@ async fn main() -> Result<(), MainError> {
                             let indexed_tx = IndexedTx {
                                 height,
                                 index: TxIndex(idx as u32),
-                                is_fee_unshielding: true,
+                                is_fee_unshielding: false,
                             };
 
                             update_witness_map(
@@ -160,16 +169,8 @@ async fn main() -> Result<(), MainError> {
                             shielded_txs.insert(indexed_tx, inner_tx);
                         }
 
-                        let chain_state = ChainState::new(block_height);
-
-                        let conn_obj = app_state
-                            .clone()
-                            .get_db_connection()
-                            .await
-                            .into_db_error()?;
-
-                        db_service::commit(
-                            conn_obj,
+                        db_service::commit_masp(
+                            &conn_obj,
                             chain_state,
                             commitment_tree.clone(),
                             witness_map.clone(),
@@ -184,6 +185,12 @@ async fn main() -> Result<(), MainError> {
                             block_height
                         );
                     }
+
+                    db_service::commit_state(&conn_obj, chain_state)
+                        .await
+                        .into_db_error()?;
+                    
+                    tracing::info!("Done processing block height {}!", height);
 
                     Ok(())
                 }

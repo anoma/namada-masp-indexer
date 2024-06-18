@@ -1,8 +1,7 @@
 CREATE TABLE notes_map (
-  id SERIAL PRIMARY KEY,
+  note_position INT PRIMARY KEY,
   note_index INT NOT NULL,
   is_fee_unshielding BOOLEAN NOT NULL,
-  note_position INT NOT NULL,
   block_height INT NOT NULL
 );
 

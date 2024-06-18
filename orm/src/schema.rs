@@ -15,11 +15,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    notes_map (id) {
-        id -> Int4,
+    notes_map (note_position) {
+        note_position -> Int4,
         note_index -> Int4,
         is_fee_unshielding -> Bool,
-        note_position -> Int4,
         block_height -> Int4,
     }
 }

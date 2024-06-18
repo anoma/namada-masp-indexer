@@ -35,8 +35,6 @@ impl ApplicationServer {
 
         let app_state = AppState::new(db_url)?;
 
-        // /api/v1/txs?from=<10>size=<1>
-
         let routes = {
             let common_state = CommonState::new(app_state.clone());
 
