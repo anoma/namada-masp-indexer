@@ -1,0 +1,162 @@
+openapi: '3.0.2'
+info:
+  title: Masp Indexer
+  version: '1.0'
+servers:
+  - url: https://localhost:5000/api/v1
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          description: OK
+  /commitment-tree:
+    get:
+      parameters:
+        - in: query
+          name: height
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The commitment tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TreeResponse'
+  /notes-map:
+    get:
+      parameters:
+        - in: query
+          name: height
+          schema:
+            type: integer
+        - in: query
+          name: from
+          schema:
+            type: integer
+        - in: query
+          name: size
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The notes map between two block heights
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotesMapResponse'
+  /witness-map:
+    get:
+      parameters:
+        - in: query
+          name: height
+          schema:
+            type: integer
+        - in: query
+          name: from
+          schema:
+            type: integer
+        - in: query
+          name: size
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The witness map of a specific block height
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TreeResponse'
+  /tx:
+    get:
+      parameters:
+        - in: query
+          name: height
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: size
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The masp transactions between two block height
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TxResponse'
+
+components:
+  schemas:
+    TreeResponse:
+      type: object
+      properties:
+        commitment_tree:
+          type: string
+          format: byte
+          description: The commitment tree bytes.
+        block_height:
+          type: integer
+          description: The block height of the commitment tree
+    WitnessMapResponse:
+      type: object
+      properties:
+        witnesses:
+          type: array
+          items:
+            type: object
+            properties:
+              bytes:
+                type: string
+                format: byte
+                description: The witness bytes.
+              index:
+                type: integer
+                description: The witness index.
+          description: The commitment tree bytes.
+        block_height:
+          type: integer
+          description: The block height of the commitment tree
+    NotesMapResponse:
+      type: object
+      properties:
+        witnesses:
+          type: array
+          items:
+            type: object
+            properties:
+              note_positon:
+                type: integer
+                description: The note position.
+              index:
+                type: integer
+                description: The note index.
+              is_fee_unshielding:
+                type: boolean
+                description: If this is s fee unshielded.
+              block_height:
+                type: integer
+                description: The note block height.
+          description: The vector of notes map
+    TxResponse:
+      type: object
+      properties:
+        witnesses:
+          type: array
+          items:
+            type: object
+            properties:
+              bytes:
+                type: string
+                format: byte
+                description: The masp transaction bytes.
+              index:
+                type: integer
+                description: The note index.
+              block_height:
+                type: integer
+                description: The note block height.
+          description: The vector of masp transactions

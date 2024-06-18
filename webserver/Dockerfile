@@ -1,7 +1,5 @@
 # use the default dart image as the build image
-FROM rust:1.77 AS builder
-
-ARG PRODUCTION_BUILD="false"
+FROM rust:1.78-bookworm AS builder
 
 RUN apt-get update && apt-get install -y protobuf-compiler
 
@@ -17,7 +15,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update
 RUN cargo build --release --package webserver
 
 # use a slim image
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y ca-certificates libpq5
 

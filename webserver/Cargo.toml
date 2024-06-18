@@ -12,10 +12,6 @@ version.workspace = true
 name = "webserver"
 path = "src/main.rs"
 
-[lib]
-name = "webserver"
-path = "src/lib.rs"
-
 [features]
 production = []
 
@@ -46,8 +42,6 @@ chrono.workspace = true
 reqwest.workspace = true
 subtle-encoding.workspace = true
 futures.workspace = true
-deadpool-redis = "0.13.0"
-redis = { version = "0.23.3", features = ["aio"] }
 async-trait.workspace = true
 
 [build-dependencies]

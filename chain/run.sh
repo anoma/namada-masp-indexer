@@ -1,0 +1,1 @@
+cargo run --release -- --tendermint-url http://127.0.0.1:27657 --database-url postgres://postgres:password@0.0.0.0:5435/namada-masp-indexer --chain-id local.61271083678d6bb47c35eda1 --checksums-filepath ../artifacts/checksums.json

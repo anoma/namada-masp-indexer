@@ -82,3 +82,8 @@ rust-project.json
 
 
 # End of https://www.toptal.com/developers/gitignore/api/osx,git,macos,rust-analyzer,rust
+.idea/
+.env
+
+artifacts/*.json
+masp.sh
