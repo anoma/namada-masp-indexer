@@ -13,6 +13,7 @@ use clap_verbosity_flag::LevelFilter;
 use result::MainError;
 use shared::height::BlockHeight;
 use shared::indexed_tx::IndexedTx;
+use shared::transaction::{MaspTx, Transaction};
 use shared::tx_index::TxIndex;
 use tendermint_rpc::HttpClient;
 use tokio::signal;
@@ -149,13 +150,12 @@ async fn main() -> Result<(), MainError> {
                         tm_block_response.transactions.len()
                     );
 
-                    for (idx, batch_tx) in
+                    for (idx, Transaction { masp_txs, .. }) in
                         tm_block_response.transactions.into_iter().enumerate()
                     {
-                        for (masp_tx, _memo) in batch_tx.masp_tx {
+                        for MaspTx { masp_tx, .. } in masp_txs {
                             // TODO: handle fee unshielding
 
-                            let inner_tx = masp_tx.0;
                             let indexed_tx = IndexedTx {
                                 height,
                                 index: TxIndex(idx as u32),
@@ -167,11 +167,11 @@ async fn main() -> Result<(), MainError> {
                                 tx_note_map.clone(),
                                 witness_map.clone(),
                                 indexed_tx,
-                                &inner_tx,
+                                &masp_tx,
                             )
                             .map_err(MainError::Masp)?;
 
-                            shielded_txs.insert(indexed_tx, inner_tx);
+                            shielded_txs.insert(indexed_tx, masp_tx);
                         }
 
                         db_service::commit_masp(
@@ -186,8 +186,7 @@ async fn main() -> Result<(), MainError> {
                         .into_db_error()?;
 
                         tracing::info!(
-                            "Done committing block {}!",
-                            block_height
+                            "Done committing masp txs of block {block_height}!"
                         );
                     }
 
@@ -195,7 +194,7 @@ async fn main() -> Result<(), MainError> {
                         .await
                         .into_db_error()?;
 
-                    tracing::info!("Done processing block height {}!", height);
+                    tracing::info!("Done processing block height {height}!");
 
                     Ok(())
                 }

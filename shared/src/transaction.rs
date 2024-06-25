@@ -34,14 +34,16 @@ impl From<TxEventStatusCode> for TransactionExitStatus {
 }
 
 #[derive(Debug, Clone)]
-pub struct MaspTxType(pub NamadaMaspTransaction);
+pub struct MaspTx {
+    pub masp_tx: NamadaMaspTransaction,
+    pub tx_memo: Option<Vec<u8>>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
     pub hash: Id,
-    pub masp_tx: Vec<(MaspTxType, Option<Vec<u8>>)>,
-    pub fee_unshielding_tx: Option<NamadaMaspTransaction>, /* TODO: fix once
-                                                            * stabe */
+    pub masp_txs: Vec<MaspTx>,
+    pub fee_unshielding_tx: Option<MaspTx>, // TODO
 }
 
 impl TryFrom<&[u8]> for Transaction {
@@ -64,45 +66,45 @@ impl TryFrom<&[u8]> for Transaction {
             .batch
             .into_iter()
             .filter_map(|tx_commitment| {
-                let tx_data =
-                    transaction.data(&tx_commitment).unwrap_or_default();
-                let tx_memo = transaction.memo(&tx_commitment);
+                let tx_data = transaction.data(&tx_commitment)?;
 
-                if let Ok(data) = ShieldedTransfer::try_from_slice(&tx_data) {
-                    Some((MaspTxType(data.masp_tx), tx_memo))
-                } else if let Ok(data) =
-                    UnshieldingTransfer::try_from_slice(&tx_data)
-                {
+                let shielded_transfer = || {
+                    let data =
+                        ShieldedTransfer::try_from_slice(&tx_data).ok()?;
+                    let tx_memo = transaction.memo(&tx_commitment);
+                    Some(MaspTx {
+                        tx_memo,
+                        masp_tx: data.masp_tx,
+                    })
+                };
+                let unshielding_transfer = || {
+                    let data =
+                        UnshieldingTransfer::try_from_slice(&tx_data).ok()?;
                     let masp_tx = transaction
                         .get_section(&data.shielded_section_hash)
-                        .and_then(|s| s.masp_tx())
-                        .map(MaspTxType);
-                    if let Some(masp_tx) = masp_tx {
-                        return Some((masp_tx, tx_memo));
-                    } else {
-                        return None;
-                    }
-                } else if let Ok(data) =
-                    ShieldingTransfer::try_from_slice(&tx_data)
-                {
+                        .and_then(|s| s.masp_tx())?;
+                    let tx_memo = transaction.memo(&tx_commitment);
+                    Some(MaspTx { masp_tx, tx_memo })
+                };
+                let shielding_transfer = || {
+                    let data =
+                        ShieldingTransfer::try_from_slice(&tx_data).ok()?;
                     let masp_tx = transaction
                         .get_section(&data.shielded_section_hash)
-                        .and_then(|s| s.masp_tx())
-                        .map(MaspTxType);
-                    if let Some(masp_tx) = masp_tx {
-                        return Some((masp_tx, tx_memo));
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
+                        .and_then(|s| s.masp_tx())?;
+                    let tx_memo = transaction.memo(&tx_commitment);
+                    Some(MaspTx { masp_tx, tx_memo })
+                };
+
+                shielded_transfer()
+                    .or_else(unshielding_transfer)
+                    .or_else(shielding_transfer)
             })
             .collect();
 
         Ok(Transaction {
+            masp_txs,
             hash: Id::from(transaction_id),
-            masp_tx: masp_txs,
             fee_unshielding_tx: None,
         })
     }
