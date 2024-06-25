@@ -2,7 +2,7 @@ use diesel::{
     BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
     SelectableHelper,
 };
-use orm::schema::{tx};
+use orm::schema::tx;
 use orm::tx::TxDb;
 
 use crate::appstate::AppState;

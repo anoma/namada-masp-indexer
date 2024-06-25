@@ -28,13 +28,11 @@ pub fn update_witness_map(
 
         // Update each merkle tree in the witness map with the latest
         // addition
-        witness_map
-            .update(node)
-            .map_err(|note_pos| format!("witness map is full at note {note_pos}"))?;
+        witness_map.update(node).map_err(|note_pos| {
+            format!("witness map is full at note {note_pos}")
+        })?;
 
-        if !commitment_tree
-            .append(node)
-        {
+        if !commitment_tree.append(node) {
             return Err("note commitment tree is full".to_string());
         }
 

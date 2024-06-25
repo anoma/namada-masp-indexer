@@ -189,7 +189,7 @@ async fn main() -> Result<(), MainError> {
                     db_service::commit_state(&conn_obj, chain_state)
                         .await
                         .into_db_error()?;
-                    
+
                     tracing::info!("Done processing block height {}!", height);
 
                     Ok(())

@@ -7,7 +7,9 @@ use tendermint::account::Id as TendermintAccountId;
 use tendermint::block::Id as TendermintBlockId;
 use tendermint::{AppHash as TendermintAppHash, Hash as TendermintHash};
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Deserialize, Serialize, PartialOrd, Ord,
+)]
 pub enum Id {
     Account(String),
     Hash(String),

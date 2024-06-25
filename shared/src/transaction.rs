@@ -6,7 +6,7 @@ use namada_sdk::masp::ShieldedTransfer;
 use namada_sdk::token::{ShieldingTransfer, UnshieldingTransfer};
 use namada_tx::Tx as NamadaTx;
 
-use crate::block_results::{TxEventStatusCode};
+use crate::block_results::TxEventStatusCode;
 use crate::id::Id;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,7 +40,8 @@ pub struct MaspTxType(pub NamadaMaspTransaction);
 pub struct Transaction {
     pub hash: Id,
     pub masp_tx: Vec<(MaspTxType, Option<Vec<u8>>)>,
-    pub fee_unshielding_tx: Option<NamadaMaspTransaction>, // TODO: fix once stabe
+    pub fee_unshielding_tx: Option<NamadaMaspTransaction>, /* TODO: fix once
+                                                            * stabe */
 }
 
 impl TryFrom<&[u8]> for Transaction {
@@ -72,20 +73,26 @@ impl TryFrom<&[u8]> for Transaction {
                 } else if let Ok(data) =
                     UnshieldingTransfer::try_from_slice(&tx_data)
                 {
-                    let masp_tx = transaction.get_section(&data.shielded_section_hash).and_then(|s| s.masp_tx()).map(MaspTxType);
+                    let masp_tx = transaction
+                        .get_section(&data.shielded_section_hash)
+                        .and_then(|s| s.masp_tx())
+                        .map(MaspTxType);
                     if let Some(masp_tx) = masp_tx {
                         return Some((masp_tx, tx_memo));
                     } else {
-                        return None
+                        return None;
                     }
                 } else if let Ok(data) =
                     ShieldingTransfer::try_from_slice(&tx_data)
                 {
-                    let masp_tx = transaction.get_section(&data.shielded_section_hash).and_then(|s| s.masp_tx()).map(MaspTxType);
+                    let masp_tx = transaction
+                        .get_section(&data.shielded_section_hash)
+                        .and_then(|s| s.masp_tx())
+                        .map(MaspTxType);
                     if let Some(masp_tx) = masp_tx {
                         return Some((masp_tx, tx_memo));
                     } else {
-                        return None
+                        return None;
                     }
                 } else {
                     return None;
