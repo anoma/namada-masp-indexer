@@ -132,7 +132,7 @@ pub async fn commit_masp(
                     commitment_tree.into_db(chain_state.block_height);
                 let witness_map_db =
                     witness_map.into_db(chain_state.block_height);
-                let notes_map_db = notes_map.into_db(chain_state.block_height);
+                let notes_map_db = notes_map.into_db();
 
                 let shielded_txs_db = shielded_txs
                     .iter()
