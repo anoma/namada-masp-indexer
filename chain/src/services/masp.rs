@@ -30,11 +30,13 @@ pub fn update_witness_map(
         // addition
         witness_map
             .update(node)
-            .map_err(|()| "note commitment tree is full".to_string())?;
+            .map_err(|note_pos| format!("witness map is full at note {note_pos}"))?;
 
-        commitment_tree
+        if !commitment_tree
             .append(node)
-            .map_err(|()| "note commitment tree is full".to_string())?;
+        {
+            return Err("note commitment tree is full".to_string());
+        }
 
         // Finally, make it easier to construct merkle paths to this new
         // note

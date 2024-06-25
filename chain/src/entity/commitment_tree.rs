@@ -18,8 +18,8 @@ impl CommitmentTree {
         self.0.lock().unwrap().size()
     }
 
-    pub fn append(&self, node: Node) -> Result<(), ()> {
-        self.0.lock().unwrap().append(node)
+    pub fn append(&self, node: Node) -> bool {
+        self.0.lock().unwrap().append(node).is_ok()
     }
 
     pub fn get_tree(&self) -> MaspCommitmentTree<Node> {

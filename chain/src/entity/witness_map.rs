@@ -15,9 +15,9 @@ impl WitnessMap {
         Self(Arc::new(Mutex::new(tree)))
     }
 
-    pub fn update(&self, node: Node) -> Result<(), ()> {
-        for (_, witness) in self.0.lock().unwrap().iter_mut() {
-            witness.append(node)?
+    pub fn update(&self, node: Node) -> Result<(), usize> {
+        for (note_pos, witness) in self.0.lock().unwrap().iter_mut() {
+            witness.append(node).map_err(|()| *note_pos)?;
         }
         Ok(())
     }

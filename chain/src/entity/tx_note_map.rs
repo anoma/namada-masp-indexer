@@ -13,10 +13,6 @@ impl TxNoteMap {
         Self(Arc::new(Mutex::new(tree)))
     }
 
-    pub fn len(&self) -> usize {
-        self.0.lock().unwrap().len()
-    }
-
     pub fn insert(&self, indexed_tx: IndexedTx, note_pos: usize) {
         self.0.lock().unwrap().insert(indexed_tx, note_pos);
     }
