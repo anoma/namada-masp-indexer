@@ -25,6 +25,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TreeResponse'
+  /height:
+    get:
+      responses:
+        '200':
+          description: The last indexed block height.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LatestHeightResponse'
   /notes-map:
     get:
       parameters:
@@ -93,6 +102,13 @@ components:
           type: integer
           minimum: 0
           description: The block height of the commitment tree.
+    LatestHeightResponse:
+      type: object
+      properties:
+        block_height:
+          type: integer
+          minimum: 0
+          description: The last indexed block height.
     WitnessMapResponse:
       type: object
       properties:

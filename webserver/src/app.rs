@@ -49,6 +49,7 @@ impl ApplicationServer {
                 )
                 .route("/notes-map", get(handler::notes_map::get_notes_map))
                 .route("/tx", get(handler::tx::get_tx))
+                .route("/height", get(handler::namada_state::get_latest_height))
                 .with_state(common_state)
         };
 
