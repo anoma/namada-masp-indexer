@@ -14,11 +14,8 @@ pub async fn get_commitment_tree(
     State(state): State<CommonState>,
     Query(query_params): Query<TreeQueryParams>,
 ) -> Result<Json<TreeResponse>, TreeError> {
-    let commitment_tree = if let Some(height) = query_params.height {
-        state.tree_service.get_at_height(height).await
-    } else {
-        state.tree_service.get_latest().await
-    };
+    let commitment_tree =
+        state.tree_service.get_at_height(query_params.height).await;
 
     if let Some((commitment_tree, block_height)) = commitment_tree {
         Ok(Json(TreeResponse {

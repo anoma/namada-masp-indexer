@@ -18,10 +18,9 @@ impl NotesMapService {
     pub async fn get_notes_map(
         &self,
         from_block_height: u64,
-        to_block_height: u64,
     ) -> Vec<(u64, bool, u64, u64)> {
         self.notes_map_repo
-            .get_notes_map(from_block_height as i32, to_block_height as i32)
+            .get_notes_map(from_block_height as i32)
             .await
             .unwrap_or_default()
             .into_iter()

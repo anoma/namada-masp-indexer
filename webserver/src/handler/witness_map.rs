@@ -16,13 +16,8 @@ pub async fn get_witness_map(
     Query(query_params): Query<WitnessMapQueryParams>,
 ) -> Result<Json<WitnessMapResponse>, WitnessMapError> {
     let block_height = BlockHeight(query_params.height);
-    let from_index = query_params.from;
-    let to_index = from_index + query_params.size;
 
-    let witnesses = state
-        .witness_map_service
-        .get_witnesses(block_height, from_index, to_index)
-        .await;
+    let witnesses = state.witness_map_service.get_witnesses(block_height).await;
 
     if let Some(witnesses) = witnesses {
         Ok(Json(WitnessMapResponse::new(block_height, witnesses)))

@@ -20,8 +20,6 @@ impl WitnessMapService {
     pub async fn get_witnesses(
         &self,
         block_height: BlockHeight,
-        from_index: u64,
-        to_index: u64,
     ) -> Option<Vec<(Vec<u8>, u64)>> {
         let block_height_exist = self
             .witness_map_repo
@@ -29,11 +27,7 @@ impl WitnessMapService {
             .await;
         if block_height_exist {
             self.witness_map_repo
-                .get_witnesses(
-                    block_height.0 as i32,
-                    from_index as i32,
-                    to_index as i32,
-                )
+                .get_witnesses(block_height.0 as i32)
                 .await
                 .ok()
                 .map(|witnesses| {

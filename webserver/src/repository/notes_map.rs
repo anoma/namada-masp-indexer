@@ -1,7 +1,4 @@
-use diesel::{
-    BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
-    SelectableHelper,
-};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use orm::notes_map::NotesMapDb;
 use orm::schema::notes_map;
 
@@ -17,7 +14,6 @@ pub trait NotesMapRepositoryTrait {
     async fn get_notes_map(
         &self,
         from_block_height: i32,
-        to_block_height: i32,
     ) -> Result<Vec<NotesMapDb>, String>;
 }
 
@@ -29,17 +25,12 @@ impl NotesMapRepositoryTrait for NotesMapRepository {
     async fn get_notes_map(
         &self,
         from_block_height: i32,
-        to_block_height: i32,
     ) -> Result<Vec<NotesMapDb>, String> {
         let conn = self.app_state.get_db_connection().await.unwrap();
 
         conn.interact(move |conn| {
             notes_map::table
-                .filter(
-                    notes_map::dsl::block_height
-                        .ge(from_block_height)
-                        .and(notes_map::dsl::block_height.le(to_block_height)),
-                )
+                .filter(notes_map::dsl::block_height.le(from_block_height))
                 .select(NotesMapDb::as_select())
                 .get_results(conn)
                 .unwrap_or_default()

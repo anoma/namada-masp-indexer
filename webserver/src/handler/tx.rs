@@ -15,7 +15,7 @@ pub async fn get_tx(
     Query(query_params): Query<TxQueryParams>,
 ) -> Result<Json<TxResponse>, TxError> {
     let from_block_height = query_params.height;
-    let to_block_height = from_block_height + query_params.size;
+    let to_block_height = from_block_height + query_params.height_offset;
 
     let txs = state
         .tx_service

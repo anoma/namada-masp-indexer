@@ -15,11 +15,12 @@ paths:
       parameters:
         - in: query
           name: height
+          required: true
           schema:
             type: integer
       responses:
         '200':
-          description: The commitment tree
+          description: The commitment tree at the given height.
           content:
             application/json:
               schema:
@@ -29,19 +30,13 @@ paths:
       parameters:
         - in: query
           name: height
+          required: true
           schema:
             type: integer
-        - in: query
-          name: from
-          schema:
-            type: integer
-        - in: query
-          name: size
-          schema:
-            type: integer
+            minimum: 0
       responses:
         '200':
-          description: The notes map between two block heights
+          description: The notes map up to some block height.
           content:
             application/json:
               schema:
@@ -51,19 +46,13 @@ paths:
       parameters:
         - in: query
           name: height
+          required: true
           schema:
             type: integer
-        - in: query
-          name: from
-          schema:
-            type: integer
-        - in: query
-          name: size
-          schema:
-            type: integer
+            minimum: 0
       responses:
         '200':
-          description: The witness map of a specific block height
+          description: The witness map of a specific block height.
           content:
             application/json:
               schema:
@@ -76,14 +65,16 @@ paths:
           required: true
           schema:
             type: integer
+            minimum: 0
         - in: query
-          name: size
+          name: height_offset
           required: true
           schema:
             type: integer
+            minimum: 0
       responses:
         '200':
-          description: The masp transactions between two block height
+          description: The masp transactions between `height` and `height + height_offset`.
           content:
             application/json:
               schema:
@@ -100,7 +91,8 @@ components:
           description: The commitment tree bytes.
         block_height:
           type: integer
-          description: The block height of the commitment tree
+          minimum: 0
+          description: The block height of the commitment tree.
     WitnessMapResponse:
       type: object
       properties:
@@ -115,11 +107,13 @@ components:
                 description: The witness bytes.
               index:
                 type: integer
+                minimum: 0
                 description: The witness index.
           description: The commitment tree bytes.
         block_height:
           type: integer
-          description: The block height of the commitment tree
+          minimum: 0
+          description: The block height of the commitment tree.
     NotesMapResponse:
       type: object
       properties:
@@ -130,17 +124,20 @@ components:
             properties:
               note_positon:
                 type: integer
+                minimum: 0
                 description: The note position.
               index:
                 type: integer
+                minimum: 0
                 description: The note index.
               is_fee_unshielding:
                 type: boolean
                 description: If this is s fee unshielded.
               block_height:
                 type: integer
+                minimum: 0
                 description: The note block height.
-          description: The vector of notes map
+          description: The vector of notes map.
     TxResponse:
       type: object
       properties:
@@ -155,8 +152,10 @@ components:
                 description: The masp transaction bytes.
               index:
                 type: integer
+                minimum: 0
                 description: The note index.
               block_height:
                 type: integer
+                minimum: 0
                 description: The note block height.
-          description: The vector of masp transactions
+          description: The vector of masp transactions.
