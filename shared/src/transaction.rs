@@ -34,9 +34,17 @@ impl From<TxEventStatusCode> for TransactionExitStatus {
 }
 
 #[derive(Debug, Clone)]
+pub enum MaspTxKind {
+    ShieldedTransfer,
+    ShieldingTransfer,
+    UnshieldingTransfer,
+}
+
+#[derive(Debug, Clone)]
 pub struct MaspTx {
     pub masp_tx: NamadaMaspTransaction,
     pub tx_memo: Option<Vec<u8>>,
+    pub kind: MaspTxKind,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +83,7 @@ impl TryFrom<&[u8]> for Transaction {
                     Some(MaspTx {
                         tx_memo,
                         masp_tx: data.masp_tx,
+                        kind: MaspTxKind::ShieldedTransfer,
                     })
                 };
                 let unshielding_transfer = || {
@@ -84,7 +93,11 @@ impl TryFrom<&[u8]> for Transaction {
                         .get_section(&data.shielded_section_hash)
                         .and_then(|s| s.masp_tx())?;
                     let tx_memo = transaction.memo(&tx_commitment);
-                    Some(MaspTx { masp_tx, tx_memo })
+                    Some(MaspTx {
+                        masp_tx,
+                        tx_memo,
+                        kind: MaspTxKind::UnshieldingTransfer,
+                    })
                 };
                 let shielding_transfer = || {
                     let data =
@@ -93,7 +106,11 @@ impl TryFrom<&[u8]> for Transaction {
                         .get_section(&data.shielded_section_hash)
                         .and_then(|s| s.masp_tx())?;
                     let tx_memo = transaction.memo(&tx_commitment);
-                    Some(MaspTx { masp_tx, tx_memo })
+                    Some(MaspTx {
+                        masp_tx,
+                        tx_memo,
+                        kind: MaspTxKind::ShieldingTransfer,
+                    })
                 };
 
                 shielded_transfer()
