@@ -1,7 +1,4 @@
 use crate::appstate::AppState;
-use crate::repository::notes_map::{
-    NotesMapRepositoryTrait,
-};
 use crate::repository::tx::{TxRepository, TxRepositoryTrait};
 
 #[derive(Clone)]

@@ -1,7 +1,5 @@
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use namada_sdk::queries::RPC;
-use namada_sdk::rpc;
-use shared::epoch::Epoch;
 use shared::height::BlockHeight;
 use tendermint_rpc::HttpClient;
 
@@ -18,19 +16,4 @@ pub async fn is_block_committed(
     Ok(last_block
         .map(|b| block_height.0 <= b.height.0)
         .unwrap_or(false))
-}
-
-pub async fn get_epoch_at_block_height(
-    client: &HttpClient,
-    block_height: BlockHeight,
-) -> anyhow::Result<Epoch> {
-    let epoch = rpc::query_epoch_at_height(client, block_height.into())
-        .await
-        .with_context(|| {
-            format!("Failed to query Namada's epoch at height {block_height}")
-        })?
-        .ok_or_else(|| {
-            anyhow!("No Namada epoch found for height {block_height}")
-        })?;
-    Ok(Epoch::from(epoch.0))
 }

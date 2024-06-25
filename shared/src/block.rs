@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use tendermint_rpc::endpoint::block::Response as TendermintBlock;
-use tendermint_rpc::Client;
 
 use crate::header::BlockHeader;
 use crate::id::Id;
