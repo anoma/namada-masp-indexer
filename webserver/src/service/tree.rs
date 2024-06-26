@@ -13,15 +13,6 @@ impl TreeService {
         }
     }
 
-    pub async fn get_latest(&self) -> Option<(Vec<u8>, u64)> {
-        let commiment_tree = self.tree_repo.get_latest().await.unwrap();
-        if let Some(tree) = commiment_tree {
-            Some((tree.tree, tree.block_height as u64))
-        } else {
-            None
-        }
-    }
-
     pub async fn get_at_height(
         &self,
         block_height: u64,
