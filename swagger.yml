@@ -133,7 +133,7 @@ components:
     NotesMapResponse:
       type: object
       properties:
-        witnesses:
+        notes_map:
           type: array
           items:
             type: object
@@ -157,7 +157,7 @@ components:
     TxResponse:
       type: object
       properties:
-        witnesses:
+        txs:
           type: array
           items:
             type: object
