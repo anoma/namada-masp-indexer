@@ -10,7 +10,7 @@ use crate::transaction::Transaction;
 pub struct Block {
     pub hash: Id,
     pub header: BlockHeader,
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<(usize, Transaction)>,
 }
 
 impl From<TendermintBlock> for Block {
@@ -22,8 +22,11 @@ impl From<TendermintBlock> for Block {
                 .block
                 .data
                 .iter()
-                .filter_map(|tx_bytes| {
-                    Transaction::try_from(tx_bytes.as_ref()).ok()
+                .enumerate()
+                .filter_map(|(index, tx_bytes)| {
+                    Transaction::try_from(tx_bytes.as_ref())
+                        .ok()
+                        .map(|tx| (index, tx))
                 })
                 .collect(),
         }
@@ -39,7 +42,7 @@ impl Display for Block {
             self.header.height,
             self.transactions
                 .iter()
-                .map(|tx| tx.to_string())
+                .map(|(_, tx)| tx.to_string())
                 .collect::<Vec<String>>()
         )
     }

@@ -151,7 +151,7 @@ async fn main() -> Result<(), MainError> {
                     );
 
                     for (idx, Transaction { masp_txs, .. }) in
-                        tm_block_response.transactions.into_iter().enumerate()
+                        tm_block_response.transactions.into_iter()
                     {
                         for MaspTx { masp_tx, .. } in masp_txs {
                             // TODO: handle fee unshielding
