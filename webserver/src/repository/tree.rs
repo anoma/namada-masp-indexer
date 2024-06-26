@@ -3,6 +3,7 @@ use orm::schema::commitment_tree;
 use orm::tree::TreeDb;
 
 use crate::appstate::AppState;
+use crate::utils::sql::abs;
 
 #[derive(Clone)]
 pub struct TreeRepository {
@@ -30,8 +31,10 @@ impl TreeRepositoryTrait for TreeRepository {
 
         conn.interact(move |conn| {
             commitment_tree::table
-                .filter(commitment_tree::dsl::block_height.eq(block_height))
-                .order(commitment_tree::dsl::block_height.desc())
+                .order(
+                    abs(commitment_tree::dsl::block_height - block_height)
+                        .asc(),
+                )
                 .limit(1)
                 .select(TreeDb::as_select())
                 .first(conn)

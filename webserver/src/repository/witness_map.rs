@@ -1,11 +1,9 @@
-use diesel::dsl::exists;
-use diesel::{
-    select, ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper,
-};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use orm::schema::witness;
 use orm::witness::WitnessDb;
 
 use crate::appstate::AppState;
+use crate::utils::sql::abs;
 
 #[derive(Clone)]
 pub struct WitnessMapRepository {
@@ -18,7 +16,6 @@ pub trait WitnessMapRepositoryTrait {
         &self,
         block_height: i32,
     ) -> Result<Vec<WitnessDb>, String>;
-    async fn block_height_exist(&self, block_height: i32) -> bool;
 }
 
 impl WitnessMapRepositoryTrait for WitnessMapRepository {
@@ -32,29 +29,25 @@ impl WitnessMapRepositoryTrait for WitnessMapRepository {
     ) -> Result<Vec<WitnessDb>, String> {
         let conn = self.app_state.get_db_connection().await.unwrap();
 
+        let closest_height: i32 = conn
+            .interact(move |conn| {
+                witness::table
+                    .order(abs(witness::dsl::block_height - block_height).asc())
+                    .select(witness::dsl::block_height)
+                    .first(conn)
+                    .map_err(|e| e.to_string())
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+
         conn.interact(move |conn| {
             witness::table
-                .filter(witness::dsl::block_height.eq(block_height))
+                .filter(witness::dsl::block_height.eq(closest_height))
                 .select(WitnessDb::as_select())
-                .get_results(conn)
+                .get_results::<WitnessDb>(conn)
                 .unwrap_or_default()
         })
         .await
         .map_err(|e| e.to_string())
-    }
-
-    async fn block_height_exist(&self, block_height: i32) -> bool {
-        let conn = self.app_state.get_db_connection().await.unwrap();
-
-        conn.interact(move |conn| {
-            select(exists(
-                witness::table
-                    .filter(witness::dsl::block_height.eq(block_height)),
-            ))
-            .get_result(conn)
-            .unwrap_or_default()
-        })
-        .await
-        .unwrap_or_default()
     }
 }

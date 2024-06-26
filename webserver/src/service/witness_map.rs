@@ -21,25 +21,21 @@ impl WitnessMapService {
         &self,
         block_height: BlockHeight,
     ) -> Option<Vec<(Vec<u8>, u64)>> {
-        let block_height_exist = self
-            .witness_map_repo
-            .block_height_exist(block_height.0 as i32)
-            .await;
-        if block_height_exist {
-            self.witness_map_repo
-                .get_witnesses(block_height.0 as i32)
-                .await
-                .ok()
-                .map(|witnesses| {
-                    witnesses
-                        .into_iter()
-                        .map(|witness| {
-                            (witness.witness_bytes, witness.witness_idx as u64)
-                        })
-                        .collect()
-                })
-        } else {
-            None
-        }
+        self.witness_map_repo
+            .get_witnesses(block_height.0 as i32)
+            .await
+            .ok()
+            .map(|witnesses| {
+                witnesses
+                    .into_iter()
+                    .map(|witness| {
+                        (witness.witness_bytes, witness.witness_idx as u64)
+                    })
+                    .collect()
+            })
+            .and_then(|witnesses: Vec<(Vec<u8>, u64)>| {
+                let non_empty_witnesses = !witnesses.is_empty();
+                non_empty_witnesses.then_some(witnesses)
+            })
     }
 }
