@@ -20,22 +20,25 @@ impl WitnessMapService {
     pub async fn get_witnesses(
         &self,
         block_height: BlockHeight,
-    ) -> Option<Vec<(Vec<u8>, u64)>> {
+    ) -> Option<(Vec<(Vec<u8>, u64)>, u64)> {
         self.witness_map_repo
             .get_witnesses(block_height.0 as i32)
             .await
             .ok()
-            .map(|witnesses| {
-                witnesses
-                    .into_iter()
-                    .map(|witness| {
-                        (witness.witness_bytes, witness.witness_idx as u64)
-                    })
-                    .collect()
+            .map(|(witnesses, closest_height)| {
+                (
+                    witnesses
+                        .into_iter()
+                        .map(|witness| {
+                            (witness.witness_bytes, witness.witness_idx as u64)
+                        })
+                        .collect::<Vec<_>>(),
+                    closest_height as u64,
+                )
             })
-            .and_then(|witnesses: Vec<(Vec<u8>, u64)>| {
+            .and_then(|(witnesses, closest_height)| {
                 let non_empty_witnesses = !witnesses.is_empty();
-                non_empty_witnesses.then_some(witnesses)
+                non_empty_witnesses.then_some((witnesses, closest_height))
             })
     }
 }

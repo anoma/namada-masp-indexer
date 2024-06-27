@@ -15,12 +15,16 @@ pub async fn get_witness_map(
     State(state): State<CommonState>,
     Query(query_params): Query<WitnessMapQueryParams>,
 ) -> Result<Json<WitnessMapResponse>, WitnessMapError> {
-    let block_height = BlockHeight(query_params.height);
+    let witnesses = state
+        .witness_map_service
+        .get_witnesses(BlockHeight(query_params.height))
+        .await;
 
-    let witnesses = state.witness_map_service.get_witnesses(block_height).await;
-
-    if let Some(witnesses) = witnesses {
-        Ok(Json(WitnessMapResponse::new(block_height, witnesses)))
+    if let Some((witnesses, block_height)) = witnesses {
+        Ok(Json(WitnessMapResponse::new(
+            BlockHeight(block_height),
+            witnesses,
+        )))
     } else {
         Err(WitnessMapError::NotFound)
     }

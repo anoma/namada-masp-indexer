@@ -15,7 +15,7 @@ pub trait WitnessMapRepositoryTrait {
     async fn get_witnesses(
         &self,
         block_height: i32,
-    ) -> Result<Vec<WitnessDb>, String>;
+    ) -> Result<(Vec<WitnessDb>, i32), String>;
 }
 
 impl WitnessMapRepositoryTrait for WitnessMapRepository {
@@ -26,7 +26,7 @@ impl WitnessMapRepositoryTrait for WitnessMapRepository {
     async fn get_witnesses(
         &self,
         block_height: i32,
-    ) -> Result<Vec<WitnessDb>, String> {
+    ) -> Result<(Vec<WitnessDb>, i32), String> {
         let conn = self.app_state.get_db_connection().await.unwrap();
 
         let closest_height: i32 = conn
@@ -40,14 +40,17 @@ impl WitnessMapRepositoryTrait for WitnessMapRepository {
             .await
             .map_err(|e| e.to_string())??;
 
-        conn.interact(move |conn| {
-            witness::table
-                .filter(witness::dsl::block_height.eq(closest_height))
-                .select(WitnessDb::as_select())
-                .get_results::<WitnessDb>(conn)
-                .unwrap_or_default()
-        })
-        .await
-        .map_err(|e| e.to_string())
+        let witnesses = conn
+            .interact(move |conn| {
+                witness::table
+                    .filter(witness::dsl::block_height.eq(closest_height))
+                    .select(WitnessDb::as_select())
+                    .get_results::<WitnessDb>(conn)
+                    .map_err(|e| e.to_string())
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+
+        Ok((witnesses, closest_height))
     }
 }
