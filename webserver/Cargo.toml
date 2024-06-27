@@ -43,6 +43,7 @@ reqwest.workspace = true
 subtle-encoding.workspace = true
 futures.workspace = true
 async-trait.workspace = true
+itertools.workspace = true
 
 [build-dependencies]
 vergen = { version = "8.0.0", features = ["build", "git", "gitcl"] }

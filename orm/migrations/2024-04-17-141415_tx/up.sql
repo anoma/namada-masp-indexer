@@ -1,6 +1,6 @@
 CREATE TABLE tx (
   id SERIAL PRIMARY KEY,
-  note_index INT NOT NULL,
+  block_index INT NOT NULL,
   tx_bytes bytea NOT NULL,
   block_height INT NOT NULL,
   masp_tx_index INT NOT NULL

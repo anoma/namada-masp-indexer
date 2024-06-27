@@ -138,21 +138,25 @@ components:
           items:
             type: object
             properties:
-              note_position:
-                type: integer
-                minimum: 0
-                description: The note position.
-              index:
-                type: integer
-                minimum: 0
-                description: The note index.
               is_fee_unshielding:
                 type: boolean
-                description: If this is s fee unshielded.
+                description: Whether this is a fee unshielding.
               block_height:
                 type: integer
                 minimum: 0
-                description: The note block height.
+                description: The block height containing the note.
+              block_index:
+                type: integer
+                minimum: 0
+                description: The block index containing the note.
+              masp_tx_index:
+                type: integer
+                minimum: 0
+                description: The index of the masp tx containing the note in the block.
+              note_position:
+                type: integer
+                minimum: 0
+                description: The note position in the commitment tree.
           description: The vector of notes map.
     TxResponse:
       type: object
@@ -162,16 +166,24 @@ components:
           items:
             type: object
             properties:
-              bytes:
-                type: string
-                format: byte
-                description: The masp transaction bytes.
-              index:
-                type: integer
-                minimum: 0
-                description: The note index.
               block_height:
                 type: integer
                 minimum: 0
                 description: The note block height.
+              block_index:
+                type: integer
+                minimum: 0
+                description: The index of the transaction batch in the block.
+              batch:
+                type: object
+                properties:
+                  bytes:
+                    type: string
+                    format: byte
+                    description: The masp transaction bytes.
+                  masp_tx_index:
+                    type: integer
+                    minimum: 0
+                    description: The index of the individual masp transaction in the block.
+                description: The batch of masp transactions in this slot.
           description: The vector of masp transactions.

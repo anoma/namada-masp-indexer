@@ -17,7 +17,7 @@ diesel::table! {
 diesel::table! {
     notes_map (note_position) {
         note_position -> Int4,
-        note_index -> Int4,
+        block_index -> Int4,
         is_fee_unshielding -> Bool,
         block_height -> Int4,
         masp_tx_index -> Int4,
@@ -27,7 +27,7 @@ diesel::table! {
 diesel::table! {
     tx (id) {
         id -> Int4,
-        note_index -> Int4,
+        block_index -> Int4,
         tx_bytes -> Bytea,
         block_height -> Int4,
         masp_tx_index -> Int4,

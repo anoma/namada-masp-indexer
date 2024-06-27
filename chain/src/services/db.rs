@@ -158,7 +158,7 @@ pub async fn commit(
                 let shielded_txs_db = shielded_txs
                     .iter()
                     .map(|(index, tx)| TxInsertDb {
-                        note_index: index.block_index.0 as i32,
+                        block_index: index.block_index.0 as i32,
                         tx_bytes: tx.serialize_to_vec(),
                         block_height: index.block_height.0 as i32,
                         masp_tx_index: index.masp_tx_index.0 as i32,

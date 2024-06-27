@@ -8,7 +8,7 @@ use crate::schema::tx;
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct TxDb {
     pub id: i32,
-    pub note_index: i32,
+    pub block_index: i32,
     pub tx_bytes: Vec<u8>,
     pub block_height: i32,
     pub masp_tx_index: i32,
@@ -18,7 +18,7 @@ pub struct TxDb {
 #[diesel(table_name = tx)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct TxInsertDb {
-    pub note_index: i32,
+    pub block_index: i32,
     pub tx_bytes: Vec<u8>,
     pub block_height: i32,
     pub masp_tx_index: i32,
