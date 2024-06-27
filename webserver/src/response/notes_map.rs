@@ -22,15 +22,15 @@ impl NotesMapResponse {
                 .map(
                     |(
                         is_fee_unshielding,
-                        block_index,
                         block_height,
+                        block_index,
                         masp_tx_index,
                         note_position,
                     )| {
                         Note {
                             is_fee_unshielding,
-                            block_index,
                             block_height,
+                            block_index,
                             masp_tx_index,
                             note_position,
                         }
