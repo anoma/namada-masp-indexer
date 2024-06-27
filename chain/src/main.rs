@@ -154,13 +154,13 @@ async fn main() -> Result<(), MainError> {
                     for (idx, Transaction { masp_txs, .. }) in
                         tm_block_response.transactions.into_iter()
                     {
-                        for (_, masp_tx) in masp_txs {
+                        for (masp_tx_index, masp_tx) in masp_txs {
                             // TODO: handle fee unshielding
 
                             let indexed_tx = IndexedTx {
-                                height,
-                                index: TxIndex(idx as u32),
-                                is_fee_unshielding: false,
+                                block_height,
+                                block_index: TxIndex(idx as u32),
+                                masp_tx_index,
                             };
 
                             update_witness_map(

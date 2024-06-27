@@ -6,10 +6,7 @@ use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransact
 use namada_tx::{Section, Tx as NamadaTx};
 
 use crate::id::Id;
-
-/// The order in which a masp tx appears in a Namada tx event.
-#[derive(Debug, Clone)]
-pub struct MaspTxIndex(pub usize);
+use crate::tx_index::MaspTxIndex;
 
 #[derive(Debug, Clone)]
 pub struct Transaction {

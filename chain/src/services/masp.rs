@@ -17,7 +17,8 @@ pub fn update_witness_map(
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> Result<(), String> {
     let mut note_pos = commitment_tree.size();
-    tx_note_map.insert(indexed_tx, note_pos);
+    tx_note_map
+        .insert(indexed_tx, false /* is_fee_unshielding */, note_pos);
 
     for so in shielded
         .sapling_bundle()

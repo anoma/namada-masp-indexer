@@ -20,6 +20,7 @@ diesel::table! {
         note_index -> Int4,
         is_fee_unshielding -> Bool,
         block_height -> Int4,
+        masp_tx_index -> Int4,
     }
 }
 
@@ -29,6 +30,7 @@ diesel::table! {
         note_index -> Int4,
         tx_bytes -> Bytea,
         block_height -> Int4,
+        masp_tx_index -> Int4,
     }
 }
 

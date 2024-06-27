@@ -11,6 +11,7 @@ pub struct TxDb {
     pub note_index: i32,
     pub tx_bytes: Vec<u8>,
     pub block_height: i32,
+    pub masp_tx_index: i32,
 }
 
 #[derive(Serialize, Insertable, Clone)]
@@ -20,4 +21,5 @@ pub struct TxInsertDb {
     pub note_index: i32,
     pub tx_bytes: Vec<u8>,
     pub block_height: i32,
+    pub masp_tx_index: i32,
 }
