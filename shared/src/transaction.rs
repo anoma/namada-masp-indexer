@@ -116,6 +116,10 @@ impl TryFrom<&[u8]> for Transaction {
                 shielded_transfer()
                     .or_else(unshielding_transfer)
                     .or_else(shielding_transfer)
+                //.or_else(|| {
+                //    tracing::warn!(?tx_data, "Failed to deserialize masp tx
+                // data");    None
+                //})
             })
             .collect();
 
