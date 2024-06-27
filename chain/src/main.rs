@@ -143,8 +143,6 @@ async fn main() -> Result<(), MainError> {
                     let mut shielded_txs = BTreeMap::new();
                     let mut tx_note_map = TxNoteMap::default();
 
-                    let height = block_data.header.height;
-
                     tracing::info!(
                         num_transactions = block_data.transactions.len(),
                         "Processing new masp transactions...",
@@ -181,11 +179,11 @@ async fn main() -> Result<(), MainError> {
                         commitment_tree.clone(),
                         witness_map.clone(),
                         tx_note_map,
-                        shielded_txs.clone(),
+                        shielded_txs,
                     )
                     .await
                     .into_db_error()?;
-                    tracing::info!(%height, "Committed new block");
+                    tracing::info!(%block_height, "Committed new block");
 
                     Ok(())
                 }
