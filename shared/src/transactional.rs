@@ -37,4 +37,8 @@ impl<T> Transactional<T> {
         self.committed = new_data;
         true
     }
+
+    pub fn rollback(&mut self) {
+        self.working_copy = None;
+    }
 }

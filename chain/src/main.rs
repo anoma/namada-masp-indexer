@@ -97,6 +97,10 @@ async fn main() -> Result<(), MainError> {
                 let app_state = app_state.clone();
 
                 async move {
+                    // NB: rollback changes from previous failed commit attempts
+                    witness_map.rollback();
+                    commitment_tree.rollback();
+
                     let conn_obj = app_state
                         .clone()
                         .get_db_connection()

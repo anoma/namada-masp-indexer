@@ -27,6 +27,10 @@ impl InnerCommitmentTree {
         }
     }
 
+    fn rollback(&mut self) {
+        self.transactional.rollback();
+    }
+
     fn append(&mut self, node: Node) -> bool {
         self.transactional.as_mut().append(node).is_ok()
     }
@@ -57,6 +61,10 @@ pub struct CommitmentTree(Arc<Mutex<InnerCommitmentTree>>);
 impl CommitmentTree {
     pub fn new(tree: MaspCommitmentTree<Node>) -> Self {
         Self(Arc::new(Mutex::new(InnerCommitmentTree::new(tree))))
+    }
+
+    pub fn rollback(&self) {
+        self.0.lock().unwrap().rollback()
     }
 
     pub fn size(&self) -> usize {
