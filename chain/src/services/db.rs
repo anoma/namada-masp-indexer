@@ -128,21 +128,25 @@ pub async fn commit(
         conn.build_transaction()
             .read_write()
             .run(|transaction_conn| {
-                let commitment_tree_db =
-                    commitment_tree.into_db(chain_state.block_height);
-                diesel::insert_into(schema::commitment_tree::table)
-                    .values(&commitment_tree_db)
-                    .on_conflict_do_nothing()
-                    .execute(transaction_conn)
-                    .context("Failed to insert commitment tree into db")?;
+                if let Some(commitment_tree_db) =
+                    commitment_tree.into_db(chain_state.block_height)
+                {
+                    diesel::insert_into(schema::commitment_tree::table)
+                        .values(&commitment_tree_db)
+                        .on_conflict_do_nothing()
+                        .execute(transaction_conn)
+                        .context("Failed to insert commitment tree into db")?;
+                }
 
-                let witness_map_db =
-                    witness_map.into_db(chain_state.block_height);
-                diesel::insert_into(schema::witness::table)
-                    .values(&witness_map_db)
-                    .on_conflict_do_nothing()
-                    .execute(transaction_conn)
-                    .context("Failed to insert witness map into db")?;
+                if let Some(witness_map_db) =
+                    witness_map.into_db(chain_state.block_height)
+                {
+                    diesel::insert_into(schema::witness::table)
+                        .values(&witness_map_db)
+                        .on_conflict_do_nothing()
+                        .execute(transaction_conn)
+                        .context("Failed to insert witness map into db")?;
+                }
 
                 let notes_map_db = notes_map.into_db();
                 diesel::insert_into(schema::notes_map::table)

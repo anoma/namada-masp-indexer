@@ -91,11 +91,6 @@ async fn main() -> Result<(), MainError> {
         _ = RetryIf::spawn(
             retry_strategy.clone(),
             || {
-                // FIXME: if some operation fails, we need to restart from the
-                // last checkpoint of the commitment tree and witness map. these
-                // cloning ops are just incrementing a ref counted ptr, and the
-                // underlying data structures are being mutated through a mutex
-
                 let client = client.clone();
                 let witness_map = witness_map.clone();
                 let commitment_tree = commitment_tree.clone();

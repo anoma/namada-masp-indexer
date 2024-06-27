@@ -6,4 +6,5 @@ pub mod height;
 pub mod id;
 pub mod indexed_tx;
 pub mod transaction;
+pub mod transactional;
 pub mod tx_index;
