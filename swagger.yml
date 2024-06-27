@@ -65,7 +65,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TreeResponse'
+                $ref: '#/components/schemas/WitnessMapResponse'
   /tx:
     get:
       parameters:
