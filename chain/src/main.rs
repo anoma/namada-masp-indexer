@@ -154,7 +154,7 @@ async fn main() -> Result<(), MainError> {
                     for (idx, Transaction { masp_txs, .. }) in
                         tm_block_response.transactions.into_iter()
                     {
-                        for masp_tx in masp_txs {
+                        for (_, masp_tx) in masp_txs {
                             // TODO: handle fee unshielding
 
                             let indexed_tx = IndexedTx {
