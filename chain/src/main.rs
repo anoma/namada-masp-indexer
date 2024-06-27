@@ -13,7 +13,7 @@ use clap_verbosity_flag::LevelFilter;
 use result::MainError;
 use shared::height::BlockHeight;
 use shared::indexed_tx::IndexedTx;
-use shared::transaction::{MaspTx, Transaction};
+use shared::transaction::Transaction;
 use shared::tx_index::TxIndex;
 use tendermint_rpc::HttpClient;
 use tokio::signal;
@@ -130,12 +130,13 @@ async fn main() -> Result<(), MainError> {
 
                     let tm_block_response_fut = async {
                         tracing::info!("Downloading new block...");
-                        let tm_block_response = cometbft_service::query_block(
-                            &client,
-                            block_height,
-                        )
-                        .await
-                        .into_rpc_error()?;
+                        let tm_block_response =
+                            cometbft_service::query_masp_txs_in_block(
+                                &client,
+                                block_height,
+                            )
+                            .await
+                            .into_rpc_error()?;
                         tracing::info!("Block downloaded!");
                         result::ok(tm_block_response)
                     };
@@ -153,7 +154,7 @@ async fn main() -> Result<(), MainError> {
                     for (idx, Transaction { masp_txs, .. }) in
                         tm_block_response.transactions.into_iter()
                     {
-                        for MaspTx { masp_tx, .. } in masp_txs {
+                        for masp_tx in masp_txs {
                             // TODO: handle fee unshielding
 
                             let indexed_tx = IndexedTx {

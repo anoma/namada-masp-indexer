@@ -27,3 +27,4 @@ serde_json.workspace = true
 bimap.workspace = true
 orm.workspace = true
 chrono.workspace = true
+tracing.workspace = true

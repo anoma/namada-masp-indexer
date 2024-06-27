@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
-use tendermint_rpc::endpoint::block::Response as TendermintBlock;
+use tendermint_rpc::endpoint::{block, block_results};
 
+use crate::block_results::locate_masp_txs;
 use crate::header::BlockHeader;
 use crate::id::Id;
 use crate::transaction::Transaction;
@@ -13,23 +14,40 @@ pub struct Block {
     pub transactions: Vec<(usize, Transaction)>,
 }
 
-impl From<TendermintBlock> for Block {
-    fn from(value: TendermintBlock) -> Self {
-        Block {
-            hash: Id::from(value.block_id.hash),
-            header: BlockHeader::from(value.block.header),
-            transactions: value
-                .block
-                .data
-                .iter()
-                .enumerate()
-                .filter_map(|(index, tx_bytes)| {
-                    Transaction::try_from(tx_bytes.as_ref())
-                        .ok()
-                        .map(|tx| (index, tx))
-                })
-                .collect(),
+impl Block {
+    pub fn new(
+        raw_block: block::Response,
+        raw_results: block_results::Response,
+    ) -> Self {
+        let indexed_masp_txs = locate_masp_txs(&raw_results);
+
+        let mut block = Block {
+            hash: Id::from(raw_block.block_id.hash),
+            header: BlockHeader::from(raw_block.block.header),
+            transactions: Vec::with_capacity(raw_block.block.data.len()),
+        };
+
+        for (block_index, masp_tx_sechashes) in indexed_masp_txs.locations {
+            let tx_bytes = &raw_block.block.data[block_index];
+
+            let tx =
+                match Transaction::from_namada_tx(tx_bytes, &masp_tx_sechashes)
+                {
+                    Some(tx) => tx,
+                    None => {
+                        tracing::warn!(
+                            block_hash = %block.hash,
+                            block_index,
+                            "Invalid Namada transaction in block"
+                        );
+                        continue;
+                    }
+                };
+
+            block.transactions.push((block_index, tx));
         }
+
+        block
     }
 }
 
@@ -45,11 +63,5 @@ impl Display for Block {
                 .map(|(_, tx)| tx.to_string())
                 .collect::<Vec<String>>()
         )
-    }
-}
-
-impl From<&TendermintBlock> for Block {
-    fn from(value: &TendermintBlock) -> Self {
-        Block::from(value.clone())
     }
 }
