@@ -11,7 +11,7 @@ use crate::entity::witness_map::WitnessMap;
 /// scan a new MASP transaction.
 pub fn update_witness_map(
     commitment_tree: CommitmentTree,
-    tx_note_map: TxNoteMap,
+    tx_note_map: &mut TxNoteMap,
     witness_map: WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,

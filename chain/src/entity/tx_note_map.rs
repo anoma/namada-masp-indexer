@@ -1,29 +1,23 @@
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 
 use orm::notes_map::NotesMapInsertDb;
 use shared::indexed_tx::IndexedTx;
 
-#[derive(Clone, Debug)]
-pub struct TxNoteMap(Arc<Mutex<BTreeMap<IndexedTx, (bool, usize)>>>);
+#[derive(Default, Clone, Debug)]
+pub struct TxNoteMap(BTreeMap<IndexedTx, (bool, usize)>);
 
 impl TxNoteMap {
     pub fn insert(
-        &self,
+        &mut self,
         indexed_tx: IndexedTx,
         is_fee_unshielding: bool,
         note_pos: usize,
     ) {
-        self.0
-            .lock()
-            .unwrap()
-            .insert(indexed_tx, (is_fee_unshielding, note_pos));
+        self.0.insert(indexed_tx, (is_fee_unshielding, note_pos));
     }
 
     pub fn into_db(&self) -> Vec<NotesMapInsertDb> {
         self.0
-            .lock()
-            .unwrap()
             .iter()
             .map(
                 |(
@@ -42,11 +36,5 @@ impl TxNoteMap {
                 },
             )
             .collect()
-    }
-}
-
-impl Default for TxNoteMap {
-    fn default() -> Self {
-        Self(Arc::new(Mutex::new(BTreeMap::default())))
     }
 }

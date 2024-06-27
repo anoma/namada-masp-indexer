@@ -116,7 +116,7 @@ pub async fn get_last_witness_map(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn commit_masp(
+pub async fn commit(
     conn: &Object,
     chain_state: ChainState,
     commitment_tree: CommitmentTree,
@@ -130,9 +130,26 @@ pub async fn commit_masp(
             .run(|transaction_conn| {
                 let commitment_tree_db =
                     commitment_tree.into_db(chain_state.block_height);
+                diesel::insert_into(schema::commitment_tree::table)
+                    .values(&commitment_tree_db)
+                    .on_conflict_do_nothing()
+                    .execute(transaction_conn)
+                    .context("Failed to insert commitment tree into db")?;
+
                 let witness_map_db =
                     witness_map.into_db(chain_state.block_height);
+                diesel::insert_into(schema::witness::table)
+                    .values(&witness_map_db)
+                    .on_conflict_do_nothing()
+                    .execute(transaction_conn)
+                    .context("Failed to insert witness map into db")?;
+
                 let notes_map_db = notes_map.into_db();
+                diesel::insert_into(schema::notes_map::table)
+                    .values(&notes_map_db)
+                    .on_conflict_do_nothing()
+                    .execute(transaction_conn)
+                    .context("Failed to insert notes map into db")?;
 
                 let shielded_txs_db = shielded_txs
                     .iter()
@@ -143,55 +160,18 @@ pub async fn commit_masp(
                         masp_tx_index: index.masp_tx_index.0 as i32,
                     })
                     .collect::<Vec<TxInsertDb>>();
-
-                diesel::insert_into(schema::commitment_tree::table)
-                    .values(&commitment_tree_db)
-                    .on_conflict_do_nothing()
-                    .execute(transaction_conn)
-                    .context("Failed to update crawler state in db")?;
-
-                diesel::insert_into(schema::witness::table)
-                    .values(&witness_map_db)
-                    .on_conflict_do_nothing()
-                    .execute(transaction_conn)
-                    .context("Failed to update crawler state in db")?;
-
-                diesel::insert_into(schema::notes_map::table)
-                    .values(&notes_map_db)
-                    .on_conflict_do_nothing()
-                    .execute(transaction_conn)
-                    .context("Failed to update crawler state in db")?;
-
                 diesel::insert_into(schema::tx::table)
                     .values(&shielded_txs_db)
                     .on_conflict_do_nothing()
                     .execute(transaction_conn)
-                    .context("Failed to update crawler state in db")?;
+                    .context("Failed to insert shielded txs into db")?;
 
-                anyhow::Ok(())
-            })
-    })
-    .await
-    .context_db_interact_error()?
-    .context("Commit block db transaction error")
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn commit_state(
-    conn: &Object,
-    chain_state: ChainState,
-) -> anyhow::Result<()> {
-    conn.interact(move |conn| {
-        conn.build_transaction()
-            .read_write()
-            .run(|transaction_conn| {
                 let chain_state_db = chain_state.into_db();
-
                 diesel::insert_into(schema::chain_state::table)
                     .values(&chain_state_db)
                     .on_conflict_do_nothing()
                     .execute(transaction_conn)
-                    .context("Failed to update crawler state in db")?;
+                    .context("Failed to insert last chain state into db")?;
 
                 anyhow::Ok(())
             })

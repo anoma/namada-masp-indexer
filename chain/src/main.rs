@@ -99,7 +99,6 @@ async fn main() -> Result<(), MainError> {
                 let client = client.clone();
                 let witness_map = witness_map.clone();
                 let commitment_tree = commitment_tree.clone();
-                let tx_note_map = TxNoteMap::default();
                 let app_state = app_state.clone();
 
                 async move {
@@ -128,9 +127,9 @@ async fn main() -> Result<(), MainError> {
                         return Err(MainError::Rpc);
                     }
 
-                    let tm_block_response_fut = async {
+                    let block_data = {
                         tracing::info!("Downloading new block...");
-                        let tm_block_response =
+                        let block_data =
                             cometbft_service::query_masp_txs_in_block(
                                 &client,
                                 block_height,
@@ -138,21 +137,21 @@ async fn main() -> Result<(), MainError> {
                             .await
                             .into_rpc_error()?;
                         tracing::info!("Block downloaded!");
-                        result::ok(tm_block_response)
+                        block_data
                     };
 
-                    let tm_block_response = tm_block_response_fut.await?;
-
                     let mut shielded_txs = BTreeMap::new();
-                    let height = tm_block_response.header.height;
+                    let mut tx_note_map = TxNoteMap::default();
+
+                    let height = block_data.header.height;
 
                     tracing::info!(
-                        "Processing {} transactions...",
-                        tm_block_response.transactions.len()
+                        num_transactions = block_data.transactions.len(),
+                        "Processing new masp transactions...",
                     );
 
                     for (idx, Transaction { masp_txs, .. }) in
-                        tm_block_response.transactions.into_iter()
+                        block_data.transactions.into_iter()
                     {
                         for (masp_tx_index, masp_tx) in masp_txs {
                             // TODO: handle fee unshielding
@@ -165,7 +164,7 @@ async fn main() -> Result<(), MainError> {
 
                             update_witness_map(
                                 commitment_tree.clone(),
-                                tx_note_map.clone(),
+                                &mut tx_note_map,
                                 witness_map.clone(),
                                 indexed_tx,
                                 &masp_tx,
@@ -174,28 +173,19 @@ async fn main() -> Result<(), MainError> {
 
                             shielded_txs.insert(indexed_tx, masp_tx);
                         }
-
-                        db_service::commit_masp(
-                            &conn_obj,
-                            chain_state,
-                            commitment_tree.clone(),
-                            witness_map.clone(),
-                            tx_note_map.clone(),
-                            shielded_txs.clone(),
-                        )
-                        .await
-                        .into_db_error()?;
-
-                        tracing::info!(
-                            "Done committing masp txs of block {block_height}!"
-                        );
                     }
 
-                    db_service::commit_state(&conn_obj, chain_state)
-                        .await
-                        .into_db_error()?;
-
-                    tracing::info!("Done processing block height {height}!");
+                    db_service::commit(
+                        &conn_obj,
+                        chain_state,
+                        commitment_tree.clone(),
+                        witness_map.clone(),
+                        tx_note_map,
+                        shielded_txs.clone(),
+                    )
+                    .await
+                    .into_db_error()?;
+                    tracing::info!(%height, "Committed new block");
 
                     Ok(())
                 }
