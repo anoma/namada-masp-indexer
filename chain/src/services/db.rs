@@ -107,6 +107,7 @@ pub async fn get_last_commitment_tree(
                 "Failed to deserialize commitment tree from db row data",
             )?;
             tracing::debug!("Deserialized commitment tree from db");
+            tracing::trace!(commitment_tree = ?deserialized, "Commitment tree data");
             anyhow::Ok(deserialized)
         })
         .transpose()?;
@@ -115,6 +116,8 @@ pub async fn get_last_commitment_tree(
 }
 
 pub async fn get_last_witness_map(conn: Object) -> anyhow::Result<WitnessMap> {
+    tracing::debug!("Reading last witness map from db");
+
     let witnesses = conn
         .interact(move |conn| {
             diesel::alias!(witness as witness_alias: WitnessMapAlias);
@@ -131,9 +134,11 @@ pub async fn get_last_witness_map(conn: Object) -> anyhow::Result<WitnessMap> {
                 .load_iter::<_, DbDefaultLoadingMode>(conn)
                 .context("Failed to query note witnesses from db")?
                 .try_fold(HashMap::new(), |mut accum, maybe_witness| {
+                    tracing::debug!("Reading new witness map entry from db");
                     let witness = maybe_witness.context(
                         "Failed to get note witnesses row data from db",
                     )?;
+                    tracing::debug!("Read new witness map entry from db");
                     let witness_node =
                         IncrementalWitness::<Node>::try_from_slice(
                             &witness.witness_bytes,
@@ -149,12 +154,21 @@ pub async fn get_last_witness_map(conn: Object) -> anyhow::Result<WitnessMap> {
                                  from witnesses db table"
                             )
                         })?;
+                    tracing::debug!("Deserialized new witness map entry");
+                    tracing::trace!(
+                        ?note_index,
+                        ?witness_node,
+                        "Witness map entry data"
+                    );
                     accum.insert(note_index, witness_node);
+                    tracing::trace!("Inserted data into witness map");
                     anyhow::Ok(accum)
                 })
         })
         .await
         .context_db_interact_error()??;
+
+    tracing::debug!("Read and deserialized witness map from db");
 
     Ok(WitnessMap::new(witnesses))
 }
