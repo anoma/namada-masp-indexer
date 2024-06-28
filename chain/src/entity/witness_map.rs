@@ -22,6 +22,10 @@ impl InnerWitnessMap {
         }
     }
 
+    fn size(&self) -> usize {
+        self.transactional.as_ref().len()
+    }
+
     fn rollback(&mut self) {
         self.transactional.rollback();
     }
@@ -65,6 +69,10 @@ pub struct WitnessMap(Arc<Mutex<InnerWitnessMap>>);
 impl WitnessMap {
     pub fn new(witness_map: HashMap<usize, IncrementalWitness<Node>>) -> Self {
         Self(Arc::new(Mutex::new(InnerWitnessMap::new(witness_map))))
+    }
+
+    pub fn size(&self) -> usize {
+        self.0.lock().unwrap().size()
     }
 
     pub fn rollback(&self) {

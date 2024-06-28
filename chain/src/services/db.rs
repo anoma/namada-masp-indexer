@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use deadpool_diesel::postgres::Object;
+use diesel::connection::DefaultLoadingMode as DbDefaultLoadingMode;
 use diesel::dsl::max;
 use diesel::{
-    ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
-    SelectableHelper,
+    ExpressionMethods, NullableExpressionMethods, OptionalExtension, QueryDsl,
+    RunQueryDsl, SelectableHelper,
 };
 use diesel_migrations::{
     embed_migrations, EmbeddedMigrations, MigrationHarness,
@@ -27,18 +28,21 @@ use crate::entity::tx_note_map::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 use crate::result::ContextDbInteractError;
 
-pub const MIGRATIONS: EmbeddedMigrations =
-    embed_migrations!("../orm/migrations/");
+const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../orm/migrations/");
 
 pub async fn run_migrations(conn: Object) -> anyhow::Result<()> {
+    tracing::debug!("Running db migrations...");
+
     conn.interact(|transaction_conn| {
         transaction_conn
             .run_pending_migrations(MIGRATIONS)
-            .map_err(move |_| anyhow::anyhow!("Failed to run db migrations"))?;
+            .map_err(|_| anyhow!("Failed to run db migrations"))?;
         anyhow::Ok(())
     })
     .await
     .context_db_interact_error()??;
+
+    tracing::debug!("Finished running db migrations");
 
     Ok(())
 }
@@ -65,17 +69,23 @@ pub async fn get_last_synced_block(
 
 pub async fn get_last_commitment_tree(
     conn: Object,
-    height: BlockHeight,
 ) -> anyhow::Result<Option<CommitmentTree>> {
-    tracing::debug!(
-        block_height = %height,
-        "Reading commitment tree from db"
-    );
+    tracing::debug!("Reading last commitment tree from db");
 
     let maybe_tree = conn
         .interact(move |conn| {
+            diesel::alias!(commitment_tree as commitment_tree_alias: CommitmentTreeAlias);
+
+            let max_block_height = commitment_tree_alias
+                .select(max(commitment_tree_alias.field(commitment_tree::dsl::block_height)))
+                .single_value();
+
             let tree = commitment_tree::dsl::commitment_tree
-                .filter(commitment_tree::dsl::block_height.eq(height.0 as i32))
+                .filter(
+                    commitment_tree::dsl::block_height
+                        .nullable()
+                        .eq(max_block_height),
+                )
                 .select(TreeDb::as_select())
                 .first(conn)
                 .optional()
@@ -86,46 +96,65 @@ pub async fn get_last_commitment_tree(
         .context_db_interact_error()??;
 
     tracing::debug!(
-        block_height = %height,
-        "Deserializing commitment tree from db"
+        present_in_db = maybe_tree.is_some(),
+        "Read last commitment tree from db"
     );
 
-    let maybe_tree = maybe_tree.map(|tree| tree.try_into()).transpose()?;
-
-    tracing::debug!(
-        block_height = %height,
-        "Deserialized commitment tree from db"
-    );
+    let maybe_tree = maybe_tree
+        .map(|tree| {
+            tracing::debug!("Deserializing commitment tree from db");
+            let deserialized = tree.try_into().context(
+                "Failed to deserialize commitment tree from db row data",
+            )?;
+            tracing::debug!("Deserialized commitment tree from db");
+            anyhow::Ok(deserialized)
+        })
+        .transpose()?;
 
     anyhow::Ok(maybe_tree)
 }
 
-pub async fn get_last_witness_map(
-    conn: Object,
-    height: BlockHeight,
-) -> anyhow::Result<WitnessMap> {
-    let witnesses: Vec<WitnessDb> = conn
+pub async fn get_last_witness_map(conn: Object) -> anyhow::Result<WitnessMap> {
+    let witnesses = conn
         .interact(move |conn| {
+            diesel::alias!(witness as witness_alias: WitnessMapAlias);
+
+            let max_block_height = witness_alias
+                .select(max(witness_alias.field(witness::dsl::block_height)))
+                .single_value();
+
             witness::dsl::witness
-                .filter(witness::dsl::block_height.eq(height.0 as i32))
+                .filter(
+                    witness::dsl::block_height.nullable().eq(max_block_height),
+                )
                 .select(WitnessDb::as_select())
-                .get_results(conn)
-                .unwrap_or_default()
+                .load_iter::<_, DbDefaultLoadingMode>(conn)
+                .context("Failed to query note witnesses from db")?
+                .try_fold(HashMap::new(), |mut accum, maybe_witness| {
+                    let witness = maybe_witness.context(
+                        "Failed to get note witnesses row data from db",
+                    )?;
+                    let witness_node =
+                        IncrementalWitness::<Node>::try_from_slice(
+                            &witness.witness_bytes,
+                        )
+                        .context(
+                            "Failed to deserialize note witness from db",
+                        )?;
+                    let note_index = usize::try_from(witness.witness_idx)
+                        .with_context(|| {
+                            let db_note_index = witness.witness_idx;
+                            format!(
+                                "Failed to convert note index {db_note_index} \
+                                 from witnesses db table"
+                            )
+                        })?;
+                    accum.insert(note_index, witness_node);
+                    anyhow::Ok(accum)
+                })
         })
         .await
-        .context_db_interact_error()
-        .context("Failed to read block max height in db")?;
-
-    let witnesses = witnesses
-        .into_iter()
-        .try_fold(HashMap::new(), |mut acc, witness| {
-            let witness_node = IncrementalWitness::<Node>::try_from_slice(
-                &witness.witness_bytes,
-            )?;
-            acc.insert(witness.witness_idx as usize, witness_node);
-            Ok::<_, std::io::Error>(acc)
-        })
-        .unwrap_or_default();
+        .context_db_interact_error()??;
 
     Ok(WitnessMap::new(witnesses))
 }

@@ -56,7 +56,7 @@ async fn main() -> Result<(), MainError> {
     );
 
     let client =
-        Arc::new(HttpClient::new(config.tendermint_url.as_str()).unwrap());
+        Arc::new(HttpClient::new(config.cometbft_url.as_str()).unwrap());
 
     let retry_strategy = FixedInterval::from_millis(5000).map(jitter);
     let exit_handle = must_exit_handle();
@@ -69,31 +69,41 @@ async fn main() -> Result<(), MainError> {
         app_state.get_db_connection().await.into_db_error()?,
     )
     .await
-    .into_db_error()?
-    .unwrap_or_default()
-    .next();
-
-    let commitment_tree = db_service::get_last_commitment_tree(
-        app_state.get_db_connection().await.into_db_error()?,
-        last_block_height,
-    )
-    .await
-    .into_db_error()?
-    .unwrap_or_default();
-
-    let witness_map = db_service::get_last_witness_map(
-        app_state.get_db_connection().await.into_db_error()?,
-        last_block_height,
-    )
-    .await
     .into_db_error()?;
 
-    tracing::info!(
-        next_height_to_process = %last_block_height,
-        "Last state has been loaded"
-    );
+    let (commitment_tree, witness_map) = {
+        let commitment_tree = db_service::get_last_commitment_tree(
+            app_state.get_db_connection().await.into_db_error()?,
+        )
+        .await
+        .into_db_error()?
+        .unwrap_or_default();
 
-    for block_height in last_block_height.0.. {
+        let witness_map = db_service::get_last_witness_map(
+            app_state.get_db_connection().await.into_db_error()?,
+        )
+        .await
+        .into_db_error()?;
+
+        let commitment_tree_len = commitment_tree.size();
+        let witness_map_len = witness_map.size();
+
+        if commitment_tree_len == 0 && witness_map_len != 0
+            || commitment_tree_len != 0 && witness_map_len == 0
+        {
+            panic!(
+                "Invalid database state: Commitment tree size is \
+                 {commitment_tree_len}, and witness map size is \
+                 {witness_map_len}"
+            );
+        }
+
+        (commitment_tree, witness_map)
+    };
+
+    tracing::info!(?last_block_height, "Last state has been loaded");
+
+    for block_height in last_block_height.unwrap_or_default().next().0.. {
         if must_exit(&exit_handle) {
             break;
         }
