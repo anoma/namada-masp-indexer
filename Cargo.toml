@@ -4,7 +4,7 @@ resolver = "2"
 members = ["chain", "shared", "orm", "webserver"]
 
 [workspace.package]
-authors = ["Gianmarco <gianmarco@heliax.dev>"]
+authors = ["Heliax AG <hello@heliax.dev>"]
 edition = "2021"
 license = "GPL-3.0"
 readme = "README.md"
