@@ -40,7 +40,7 @@ pub async fn run_migrations(conn: Object) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn get_last_synched_block(
+pub async fn get_last_synced_block(
     conn: Object,
 ) -> anyhow::Result<Option<BlockHeight>> {
     let block_height = conn

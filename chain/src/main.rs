@@ -60,7 +60,7 @@ async fn main() -> Result<(), MainError> {
 
     let app_state = AppState::new(config.database_url).into_db_error()?;
 
-    let last_block_height = db_service::get_last_synched_block(
+    let last_block_height = db_service::get_last_synced_block(
         app_state.get_db_connection().await.into_db_error()?,
     )
     .await
