@@ -15,7 +15,7 @@ pub fn update_witness_map(
     witness_map: &WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let mut note_pos = commitment_tree.size();
     tx_note_map
         .insert(indexed_tx, false /* is_fee_unshielding */, note_pos);
@@ -30,11 +30,11 @@ pub fn update_witness_map(
         // Update each merkle tree in the witness map with the latest
         // addition
         witness_map.update(node).map_err(|note_pos| {
-            format!("witness map is full at note {note_pos}")
+            anyhow::anyhow!("Witness map is full at note position {note_pos}")
         })?;
 
         if !commitment_tree.append(node) {
-            return Err("note commitment tree is full".to_string());
+            anyhow::bail!("Note commitment tree is full");
         }
 
         // Finally, make it easier to construct merkle paths to this new

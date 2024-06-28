@@ -1,60 +1,49 @@
-use thiserror::Error;
+use std::fmt;
 
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum MainError {
-    #[error("Masp error: {0}")]
-    Masp(String),
-    #[error("Tokio error")]
-    Tokio,
-    #[error("RPC error")]
-    Rpc,
-    #[error("Database error")]
-    Database,
+#[derive(Debug, PartialEq, Eq)]
+pub struct MainError;
+
+impl fmt::Display for MainError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Critical error led to the shutdown of the namada-masp-indexer"
+        )
+    }
 }
+
+impl std::error::Error for MainError {}
 
 #[inline(always)]
 pub fn ok<T>(x: T) -> Result<T, MainError> {
     Ok(x)
 }
 
-pub trait AsTokioError<T> {
-    fn into_tokio_error(self) -> Result<T, MainError>;
-}
+pub trait IntoMainError<T>: Sized {
+    fn into_main_error(self, description: &str) -> Result<T, MainError>;
 
-impl<T> AsTokioError<T> for anyhow::Result<T> {
-    #[inline]
-    fn into_tokio_error(self) -> Result<T, MainError> {
-        self.map_err(|reason| {
-            tracing::error!(?reason, "Tokio error");
-            MainError::Tokio
-        })
-    }
-}
-
-pub trait AsRpcError<T> {
-    fn into_rpc_error(self) -> Result<T, MainError>;
-}
-
-impl<T> AsRpcError<T> for anyhow::Result<T> {
     #[inline]
     fn into_rpc_error(self) -> Result<T, MainError> {
-        self.map_err(|reason| {
-            tracing::error!(?reason, "RPC error");
-            MainError::Rpc
-        })
+        self.into_main_error("RPC error")
+    }
+
+    #[inline]
+    fn into_db_error(self) -> Result<T, MainError> {
+        self.into_main_error("Database error")
+    }
+
+    #[inline]
+    fn into_masp_error(self) -> Result<T, MainError> {
+        self.into_main_error("MASP error")
     }
 }
 
-pub trait AsDbError<T> {
-    fn into_db_error(self) -> Result<T, MainError>;
-}
-
-impl<T> AsDbError<T> for anyhow::Result<T> {
+impl<T> IntoMainError<T> for anyhow::Result<T> {
     #[inline]
-    fn into_db_error(self) -> Result<T, MainError> {
+    fn into_main_error(self, description: &str) -> Result<T, MainError> {
         self.map_err(|reason| {
-            tracing::error!(?reason, "Database error");
-            MainError::Database
+            tracing::error!(?reason, "{description}");
+            MainError
         })
     }
 }

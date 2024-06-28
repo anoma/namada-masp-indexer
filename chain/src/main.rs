@@ -25,7 +25,7 @@ use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_note_map::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::result::{AsDbError, AsRpcError};
+use crate::result::IntoMainError;
 use crate::services::masp::update_witness_map;
 use crate::services::{
     cometbft as cometbft_service, db as db_service, rpc as rpc_service,
@@ -171,7 +171,7 @@ async fn build_and_commit_masp_data_at_height(
             %block_height,
             "Block was not processed, retrying..."
         );
-        return Err(MainError::Rpc);
+        return Err(MainError);
     }
 
     let block_data = {
@@ -218,7 +218,7 @@ async fn build_and_commit_masp_data_at_height(
                 indexed_tx,
                 &masp_tx,
             )
-            .map_err(MainError::Masp)?;
+            .into_masp_error()?;
 
             shielded_txs.insert(indexed_tx, masp_tx);
         }
