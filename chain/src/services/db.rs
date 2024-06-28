@@ -182,6 +182,11 @@ pub async fn commit(
     notes_map: TxNoteMap,
     shielded_txs: BTreeMap<IndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
+    tracing::info!(
+        block_height = %chain_state.block_height,
+        "Beginning block commit"
+    );
+
     conn.interact(move |conn| {
         conn.build_transaction()
             .read_write()
@@ -299,5 +304,12 @@ pub async fn commit(
             "Failed to commit block at height={}",
             chain_state.block_height
         )
-    })
+    })?;
+
+    tracing::info!(
+        block_height = %chain_state.block_height,
+        "Committed new block"
+    );
+
+    Ok(())
 }

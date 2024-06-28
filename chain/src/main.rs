@@ -230,8 +230,6 @@ async fn build_and_commit_masp_data_at_height(
         }
     }
 
-    tracing::info!(%block_height, "Beginning block commit...");
-
     db_service::commit(
         &conn_obj,
         chain_state,
@@ -242,7 +240,6 @@ async fn build_and_commit_masp_data_at_height(
     )
     .await
     .into_db_error()?;
-    tracing::info!(%block_height, "Committed new block");
 
     Ok(())
 }
