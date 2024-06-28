@@ -50,7 +50,10 @@ async fn main() -> Result<(), MainError> {
         tracing::subscriber::set_global_default(subscriber).unwrap();
     }
 
-    tracing::info!("version: {}", env!("VERGEN_GIT_SHA").to_string());
+    tracing::info!(
+        version = env!("VERGEN_GIT_SHA"),
+        "Started the namada-masp-indexer"
+    );
 
     let client =
         Arc::new(HttpClient::new(config.tendermint_url.as_str()).unwrap());
@@ -59,6 +62,8 @@ async fn main() -> Result<(), MainError> {
     let exit_handle = must_exit_handle();
 
     let app_state = AppState::new(config.database_url).into_db_error()?;
+
+    tracing::info!("Loading last committed state from db...");
 
     let last_block_height = db_service::get_last_synced_block(
         app_state.get_db_connection().await.into_db_error()?,
@@ -82,6 +87,11 @@ async fn main() -> Result<(), MainError> {
     )
     .await
     .into_db_error()?;
+
+    tracing::info!(
+        next_height_to_process = %last_block_height,
+        "Last state has been loaded"
+    );
 
     for block_height in last_block_height.0.. {
         if must_exit(&exit_handle) {
@@ -111,8 +121,8 @@ async fn main() -> Result<(), MainError> {
                     let chain_state = ChainState::new(block_height);
 
                     tracing::info!(
-                        "Attempting to process block: {}...",
-                        block_height
+                        %block_height,
+                        "Attempting to process new block"
                     );
 
                     if !rpc_service::is_block_committed(&client, &block_height)
@@ -120,14 +130,17 @@ async fn main() -> Result<(), MainError> {
                         .into_rpc_error()?
                     {
                         tracing::warn!(
-                            "Block {} was not processed, retrying...",
-                            block_height
+                            %block_height,
+                            "Block was not processed, retrying..."
                         );
                         return Err(MainError::Rpc);
                     }
 
                     let block_data = {
-                        tracing::info!("Downloading new block...");
+                        tracing::info!(
+                            %block_height,
+                            "Fetching block data from CometBFT"
+                        );
                         let block_data =
                             cometbft_service::query_masp_txs_in_block(
                                 &client,
@@ -135,7 +148,10 @@ async fn main() -> Result<(), MainError> {
                             )
                             .await
                             .into_rpc_error()?;
-                        tracing::info!("Block downloaded!");
+                        tracing::info!(
+                            %block_height,
+                            "Acquired block data from CometBFT"
+                        );
                         block_data
                     };
 
@@ -143,6 +159,7 @@ async fn main() -> Result<(), MainError> {
                     let mut tx_note_map = TxNoteMap::default();
 
                     tracing::info!(
+                        %block_height,
                         num_transactions = block_data.transactions.len(),
                         "Processing new masp transactions...",
                     );
@@ -171,6 +188,8 @@ async fn main() -> Result<(), MainError> {
                             shielded_txs.insert(indexed_tx, masp_tx);
                         }
                     }
+
+                    tracing::info!(%block_height, "Beginning block commit...");
 
                     db_service::commit(
                         &conn_obj,

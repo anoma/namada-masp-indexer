@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use anyhow::Context;
 use namada_sdk::borsh::{BorshDeserialize, BorshSerializeExt};
 use namada_sdk::masp_primitives::merkle_tree::CommitmentTree as MaspCommitmentTree;
 use namada_sdk::masp_primitives::sapling::Node;
@@ -86,12 +87,14 @@ impl CommitmentTree {
 }
 
 impl TryFrom<TreeDb> for CommitmentTree {
-    type Error = String;
+    type Error = anyhow::Error;
 
     fn try_from(value: TreeDb) -> Result<Self, Self::Error> {
         let commitment_tree =
-            MaspCommitmentTree::<Node>::try_from_slice(&value.tree)
-                .map_err(|e| e.to_string())?;
+            MaspCommitmentTree::<Node>::try_from_slice(&value.tree).context(
+                "Failed to deserialize commitment tree from db borsh encoded \
+                 bytes",
+            )?;
         Ok(Self::new(commitment_tree))
     }
 }

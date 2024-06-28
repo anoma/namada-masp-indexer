@@ -16,6 +16,10 @@ impl TxNoteMap {
         self.0.insert(indexed_tx, (is_fee_unshielding, note_pos));
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn into_db(&self) -> Vec<NotesMapInsertDb> {
         self.0
             .iter()
