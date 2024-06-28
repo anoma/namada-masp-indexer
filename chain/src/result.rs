@@ -1,14 +1,17 @@
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct MainError;
+
+impl fmt::Debug for MainError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "namada-masp-indexer shut down unexpectedly")
+    }
+}
 
 impl fmt::Display for MainError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Critical error led to the shutdown of the namada-masp-indexer"
-        )
+        <Self as fmt::Debug>::fmt(self, f)
     }
 }
 
