@@ -70,6 +70,7 @@ async fn main() -> Result<(), MainError> {
 
                 build_and_commit_masp_data_at_height(
                     block_height,
+                    &exit_handle,
                     client,
                     witness_map,
                     commitment_tree,
@@ -146,12 +147,17 @@ async fn load_committed_state(
 
 async fn build_and_commit_masp_data_at_height(
     block_height: BlockHeight,
+    exit_handle: &AtomicBool,
     client: Arc<HttpClient>,
     witness_map: WitnessMap,
     commitment_tree: CommitmentTree,
     app_state: AppState,
     chain_state: ChainState,
 ) -> Result<(), MainError> {
+    if must_exit(exit_handle) {
+        return Ok(());
+    }
+
     // NB: rollback changes from previous failed commit attempts
     witness_map.rollback();
     commitment_tree.rollback();
