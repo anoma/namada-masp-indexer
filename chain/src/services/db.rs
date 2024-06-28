@@ -173,7 +173,12 @@ pub async fn commit(
                 let chain_state_db = chain_state.into_db();
                 diesel::insert_into(schema::chain_state::table)
                     .values(&chain_state_db)
-                    .on_conflict_do_nothing()
+                    .on_conflict(schema::chain_state::dsl::id)
+                    .do_update()
+                    .set(
+                        schema::chain_state::block_height
+                            .eq(chain_state_db.block_height),
+                    )
                     .execute(transaction_conn)
                     .context("Failed to insert last chain state into db")?;
 

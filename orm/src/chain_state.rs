@@ -14,5 +14,6 @@ pub struct ChainStateDb {
 #[diesel(table_name = chain_state)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ChainStateteInsertDb {
+    pub id: i32,
     pub block_height: i32,
 }

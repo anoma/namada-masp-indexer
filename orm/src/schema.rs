@@ -1,7 +1,8 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    chain_state (block_height) {
+    chain_state (id) {
+        id -> Int4,
         block_height -> Int4,
     }
 }
