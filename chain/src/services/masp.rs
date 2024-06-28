@@ -10,9 +10,9 @@ use crate::entity::witness_map::WitnessMap;
 /// Update the merkle tree of witnesses the first time we
 /// scan a new MASP transaction.
 pub fn update_witness_map(
-    commitment_tree: CommitmentTree,
+    commitment_tree: &CommitmentTree,
     tx_note_map: &mut TxNoteMap,
-    witness_map: WitnessMap,
+    witness_map: &WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> Result<(), String> {

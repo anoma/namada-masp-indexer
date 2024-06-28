@@ -156,11 +156,7 @@ async fn build_and_commit_masp_data_at_height(
     witness_map.rollback();
     commitment_tree.rollback();
 
-    let conn_obj = app_state
-        .clone()
-        .get_db_connection()
-        .await
-        .into_db_error()?;
+    let conn_obj = app_state.get_db_connection().await.into_db_error()?;
 
     tracing::info!(
         %block_height,
@@ -216,9 +212,9 @@ async fn build_and_commit_masp_data_at_height(
             };
 
             update_witness_map(
-                commitment_tree.clone(),
+                &commitment_tree,
                 &mut tx_note_map,
-                witness_map.clone(),
+                &witness_map,
                 indexed_tx,
                 &masp_tx,
             )
@@ -233,8 +229,8 @@ async fn build_and_commit_masp_data_at_height(
     db_service::commit(
         &conn_obj,
         chain_state,
-        commitment_tree.clone(),
-        witness_map.clone(),
+        commitment_tree,
+        witness_map,
         tx_note_map,
         shielded_txs,
     )
