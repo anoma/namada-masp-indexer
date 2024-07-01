@@ -1,7 +1,6 @@
 pub mod appstate;
 pub mod config;
 pub mod entity;
-pub mod result;
 pub mod services;
 
 use std::collections::BTreeMap;
@@ -9,7 +8,7 @@ use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
 
 use clap::Parser;
-use result::MainError;
+use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
 use shared::transaction::Transaction;
@@ -25,7 +24,6 @@ use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_note_map::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::result::IntoMainError;
 use crate::services::masp::update_witness_map;
 use crate::services::{
     cometbft as cometbft_service, db as db_service, rpc as rpc_service,
@@ -142,7 +140,7 @@ async fn load_committed_state(
     }
     tracing::info!(?last_block_height, "Last state has been loaded");
 
-    result::ok((last_block_height, commitment_tree, witness_map))
+    shared::error::ok((last_block_height, commitment_tree, witness_map))
 }
 
 async fn build_and_commit_masp_data_at_height(

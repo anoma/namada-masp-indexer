@@ -19,6 +19,7 @@ use orm::schema::{self, chain_state, commitment_tree, witness};
 use orm::tree::TreeDb;
 use orm::tx::TxInsertDb;
 use orm::witness::WitnessDb;
+use shared::error::ContextDbInteractError;
 use shared::height::BlockHeight;
 use shared::indexed_tx::IndexedTx;
 
@@ -26,7 +27,6 @@ use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_note_map::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::result::ContextDbInteractError;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../orm/migrations/");
 
