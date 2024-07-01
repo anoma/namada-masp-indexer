@@ -17,7 +17,9 @@ impl NamadaStateService {
         }
     }
 
-    pub async fn get_latest_height(&self) -> Option<BlockHeight> {
-        self.namada_state_repo.get_latest_height().await.unwrap()
+    pub async fn get_latest_height(
+        &self,
+    ) -> anyhow::Result<Option<BlockHeight>> {
+        self.namada_state_repo.get_latest_height().await
     }
 }

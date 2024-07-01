@@ -8,15 +8,15 @@ use crate::response::api::ApiErrorResponse;
 pub enum WitnessMapError {
     #[error("WitnessMap not found")]
     NotFound,
-    #[error("Unknown error: {0}")]
-    Unknown(String),
+    #[error("Database error: {0}")]
+    Database(String),
 }
 
 impl IntoResponse for WitnessMapError {
     fn into_response(self) -> Response {
         let status_code = match self {
             WitnessMapError::NotFound => StatusCode::NOT_FOUND,
-            WitnessMapError::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            WitnessMapError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         ApiErrorResponse::send(status_code.as_u16(), Some(self.to_string()))

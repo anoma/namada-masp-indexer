@@ -1,6 +1,11 @@
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
+use anyhow::Context;
+use diesel::{
+    ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
+    SelectableHelper,
+};
 use orm::schema::commitment_tree;
 use orm::tree::TreeDb;
+use shared::error::ContextDbInteractError;
 
 use crate::appstate::AppState;
 use crate::utils::sql::abs;
@@ -15,7 +20,7 @@ pub trait TreeRepositoryTrait {
     async fn get_at_height(
         &self,
         block_height: i32,
-    ) -> Result<Option<TreeDb>, String>;
+    ) -> anyhow::Result<Option<TreeDb>>;
 }
 
 impl TreeRepositoryTrait for TreeRepository {
@@ -26,8 +31,11 @@ impl TreeRepositoryTrait for TreeRepository {
     async fn get_at_height(
         &self,
         block_height: i32,
-    ) -> Result<Option<TreeDb>, String> {
-        let conn = self.app_state.get_db_connection().await.unwrap();
+    ) -> anyhow::Result<Option<TreeDb>> {
+        let conn = self.app_state.get_db_connection().await.context(
+            "Failed to retrieve connection from the pool of database \
+             connections",
+        )?;
 
         conn.interact(move |conn| {
             commitment_tree::table
@@ -38,9 +46,15 @@ impl TreeRepositoryTrait for TreeRepository {
                 .limit(1)
                 .select(TreeDb::as_select())
                 .first(conn)
-                .ok()
+                .optional()
+                .with_context(|| {
+                    format!(
+                        "Failed to look-up commitment tree in the database \
+                         closest to the provided height {block_height}"
+                    )
+                })
         })
         .await
-        .map_err(|e| e.to_string())
+        .context_db_interact_error()?
     }
 }

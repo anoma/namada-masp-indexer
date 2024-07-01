@@ -18,11 +18,11 @@ impl NotesMapService {
     pub async fn get_notes_map(
         &self,
         from_block_height: u64,
-    ) -> Vec<(bool, u64, u64, u64, u64)> {
-        self.notes_map_repo
+    ) -> anyhow::Result<Vec<(bool, u64, u64, u64, u64)>> {
+        Ok(self
+            .notes_map_repo
             .get_notes_map(from_block_height as i32)
-            .await
-            .unwrap_or_default()
+            .await?
             .into_iter()
             .map(|notes_map_entry| {
                 (
@@ -33,6 +33,6 @@ impl NotesMapService {
                     notes_map_entry.note_position as u64,
                 )
             })
-            .collect()
+            .collect())
     }
 }

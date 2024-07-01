@@ -2,6 +2,7 @@ use anyhow::Context;
 use diesel::dsl::max;
 use diesel::{QueryDsl, RunQueryDsl};
 use orm::schema::chain_state;
+use shared::error::ContextDbInteractError;
 use shared::height::BlockHeight;
 
 use crate::appstate::AppState;
@@ -23,7 +24,10 @@ impl NamadaStateRepositoryTrait for NamadaStateRepository {
     }
 
     async fn get_latest_height(&self) -> anyhow::Result<Option<BlockHeight>> {
-        let conn = self.app_state.get_db_connection().await.unwrap();
+        let conn = self.app_state.get_db_connection().await.context(
+            "Failed to retrieve connection from the pool of database \
+             connections",
+        )?;
 
         let block_height = conn
             .interact(move |conn| {
@@ -32,7 +36,7 @@ impl NamadaStateRepositoryTrait for NamadaStateRepository {
                     .first::<Option<i32>>(conn)
             })
             .await
-            .map_err(|_| anyhow::anyhow!("Failed to interact with db"))?
+            .context_db_interact_error()?
             .context("Failed to get latest block height from db")?;
 
         Ok(block_height.map(BlockHeight::from))

@@ -19,11 +19,12 @@ impl TxService {
         &self,
         from_block_height: u64,
         to_block_height: u64,
-    ) -> impl IntoIterator<Item = (Vec<(u64, Vec<u8>)>, u64, u64)> {
-        self.tx_repo
+    ) -> anyhow::Result<impl IntoIterator<Item = (Vec<(u64, Vec<u8>)>, u64, u64)>>
+    {
+        Ok(self
+            .tx_repo
             .get_txs(from_block_height as i32, to_block_height as i32)
-            .await
-            .unwrap_or_default()
+            .await?
             .into_iter()
             // NB: the returned txs are guaranteed to be sorted
             // by their insertion order in the database, so
@@ -39,6 +40,6 @@ impl TxService {
                     .collect();
                 (tx_batch, block_height as u64, block_index as u64)
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>())
     }
 }

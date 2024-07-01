@@ -2,6 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use axum_macros::debug_handler;
 use axum_trace_id::TraceId;
+use shared::error::InspectWrap;
 use shared::height::BlockHeight;
 
 use crate::dto::witness::WitnessMapQueryParams;
@@ -15,12 +16,15 @@ pub async fn get_witness_map(
     State(state): State<CommonState>,
     Query(query_params): Query<WitnessMapQueryParams>,
 ) -> Result<Json<WitnessMapResponse>, WitnessMapError> {
-    let witnesses = state
+    let witnesses_and_height = state
         .witness_map_service
         .get_witnesses(BlockHeight(query_params.height))
-        .await;
+        .await
+        .inspect_wrap("get_witness_map", |err| {
+            WitnessMapError::Database(err.to_string())
+        })?;
 
-    if let Some((witnesses, block_height)) = witnesses {
+    if let Some((witnesses, block_height)) = witnesses_and_height {
         Ok(Json(WitnessMapResponse::new(
             BlockHeight(block_height),
             witnesses,
