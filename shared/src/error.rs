@@ -60,3 +60,24 @@ impl<T, E> ContextDbInteractError<T> for Result<T, E> {
         self.map_err(|_| anyhow::anyhow!("Failed to interact with db"))
     }
 }
+
+pub trait InspectWrap<T, E1> {
+    fn inspect_wrap<F, E2>(self, handler: &str, wrap: F) -> Result<T, E2>
+    where
+        F: FnOnce(E1) -> E2;
+}
+
+impl<T, E1> InspectWrap<T, E1> for Result<T, E1>
+where
+    E1: std::fmt::Debug,
+{
+    fn inspect_wrap<F, E2>(self, handler: &str, wrap: F) -> Result<T, E2>
+    where
+        F: FnOnce(E1) -> E2,
+    {
+        self.map_err(|err| {
+            tracing::error!(reason = ?err, "Error occurred in path handler {handler}");
+            wrap(err)
+        })
+    }
+}
