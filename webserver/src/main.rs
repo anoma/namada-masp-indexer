@@ -14,7 +14,6 @@ pub mod utils;
 
 use std::sync::Arc;
 
-use anyhow::Context;
 use clap::Parser;
 
 use crate::app::ApplicationServer;
@@ -28,9 +27,5 @@ async fn main() -> anyhow::Result<()> {
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
-    ApplicationServer::serve(config)
-        .await
-        .context("could not initialize application routes")?;
-
-    Ok(())
+    ApplicationServer::serve(config).await
 }
