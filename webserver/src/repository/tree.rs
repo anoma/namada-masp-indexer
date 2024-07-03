@@ -43,7 +43,7 @@ impl TreeRepositoryTrait for TreeRepository {
                     abs(commitment_tree::dsl::block_height - block_height)
                         .asc(),
                 )
-                .limit(1)
+                .filter(commitment_tree::dsl::block_height.le(block_height))
                 .select(TreeDb::as_select())
                 .first(conn)
                 .optional()

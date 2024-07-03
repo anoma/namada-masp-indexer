@@ -37,6 +37,7 @@ impl WitnessMapRepositoryTrait for WitnessMapRepository {
         conn.interact(move |conn| {
             let closest_height = witness::table
                 .order(abs(witness::dsl::block_height - block_height).asc())
+                .filter(witness::dsl::block_height.le(block_height))
                 .select(witness::dsl::block_height)
                 .first(conn)
                 .with_context(|| {
