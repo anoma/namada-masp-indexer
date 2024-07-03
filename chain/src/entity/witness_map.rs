@@ -6,42 +6,92 @@ use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
 use namada_sdk::masp_primitives::sapling::Node;
 use orm::witness::WitnessInsertDb;
 use shared::height::BlockHeight;
+use shared::transactional::Transactional;
 
-#[derive(Clone, Debug)]
-pub struct WitnessMap(Arc<Mutex<HashMap<usize, IncrementalWitness<Node>>>>);
+#[derive(Default, Debug)]
+struct InnerWitnessMap {
+    transactional: Transactional<HashMap<usize, IncrementalWitness<Node>>>,
+}
 
-impl WitnessMap {
-    pub fn new(tree: HashMap<usize, IncrementalWitness<Node>>) -> Self {
-        Self(Arc::new(Mutex::new(tree)))
+impl InnerWitnessMap {
+    const fn new(
+        witness_map: HashMap<usize, IncrementalWitness<Node>>,
+    ) -> Self {
+        Self {
+            transactional: Transactional::new(witness_map),
+        }
     }
 
-    pub fn update(&self, node: Node) -> Result<(), ()> {
-        for (_, witness) in self.0.lock().unwrap().iter_mut() {
-            witness.append(node)?
+    fn size(&self) -> usize {
+        self.transactional.as_ref().len()
+    }
+
+    fn rollback(&mut self) {
+        self.transactional.rollback();
+    }
+
+    fn update(&mut self, node: Node) -> Result<(), usize> {
+        for (note_pos, witness) in self.transactional.as_mut().iter_mut() {
+            witness.append(node).map_err(|()| *note_pos)?;
         }
         Ok(())
     }
 
-    pub fn insert(&self, note_pos: usize, witness: IncrementalWitness<Node>) {
-        self.0.lock().unwrap().insert(note_pos, witness);
+    fn insert(&mut self, note_pos: usize, witness: IncrementalWitness<Node>) {
+        self.transactional.as_mut().insert(note_pos, witness);
     }
 
-    pub fn into_db(&self, block_height: BlockHeight) -> Vec<WitnessInsertDb> {
-        self.0
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(idx, witness)| WitnessInsertDb {
-                witness_bytes: witness.serialize_to_vec(),
-                witness_idx: *idx as i32,
-                block_height: block_height.0 as i32,
-            })
-            .collect()
+    #[allow(clippy::wrong_self_convention)]
+    fn into_db(
+        &mut self,
+        block_height: BlockHeight,
+    ) -> Option<Vec<WitnessInsertDb>> {
+        if !self.transactional.commit() {
+            return None;
+        }
+        Some(
+            self.transactional
+                .as_ref()
+                .iter()
+                .map(|(idx, witness)| WitnessInsertDb {
+                    witness_bytes: witness.serialize_to_vec(),
+                    witness_idx: *idx as i32,
+                    block_height: block_height.0 as i32,
+                })
+                .collect(),
+        )
     }
 }
 
-impl Default for WitnessMap {
-    fn default() -> Self {
-        Self(Arc::new(Mutex::new(HashMap::default())))
+#[derive(Default, Clone, Debug)]
+pub struct WitnessMap(Arc<Mutex<InnerWitnessMap>>);
+
+impl WitnessMap {
+    pub fn new(witness_map: HashMap<usize, IncrementalWitness<Node>>) -> Self {
+        Self(Arc::new(Mutex::new(InnerWitnessMap::new(witness_map))))
+    }
+
+    pub fn size(&self) -> usize {
+        self.0.lock().unwrap().size()
+    }
+
+    pub fn rollback(&self) {
+        self.0.lock().unwrap().rollback()
+    }
+
+    pub fn update(&self, node: Node) -> Result<(), usize> {
+        self.0.lock().unwrap().update(node)
+    }
+
+    pub fn insert(&self, note_pos: usize, witness: IncrementalWitness<Node>) {
+        self.0.lock().unwrap().insert(note_pos, witness)
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    pub fn into_db(
+        &self,
+        block_height: BlockHeight,
+    ) -> Option<Vec<WitnessInsertDb>> {
+        self.0.lock().unwrap().into_db(block_height)
     }
 }

@@ -13,6 +13,7 @@ impl ChainState {
 
     pub fn into_db(&self) -> ChainStateteInsertDb {
         ChainStateteInsertDb {
+            id: 0, // NB: overwrite old row
             block_height: self.block_height.0 as i32,
         }
     }

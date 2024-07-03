@@ -2,6 +2,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::Context;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
@@ -49,6 +50,7 @@ impl ApplicationServer {
                 )
                 .route("/notes-map", get(handler::notes_map::get_notes_map))
                 .route("/tx", get(handler::tx::get_tx))
+                .route("/height", get(handler::namada_state::get_latest_height))
                 .with_state(common_state)
         };
 
@@ -86,7 +88,7 @@ impl ApplicationServer {
             .serve(router.into_make_service())
             .with_graceful_shutdown(Self::shutdown_signal())
             .await
-            .unwrap_or_else(|e| panic!("Server error: {}", e));
+            .context("The server shutdown unexpectedly")?;
 
         Ok(())
     }
@@ -121,16 +123,18 @@ impl ApplicationServer {
     async fn shutdown_signal() {
         tokio::signal::ctrl_c()
             .await
-            .expect("expect tokio signal ctrl-c");
-        println!("signal shutdown");
+            .expect("Unexpected tokio shutdown signal await error");
+        tracing::info!("Interrupt signal received, shutting down server");
     }
 
     async fn handle_404() -> impl IntoResponse {
         (
             StatusCode::NOT_FOUND,
-            axum::response::Json(serde_json::json!({
-                    "errors":{
-                    "message": vec!(String::from("The requested resource does not exist on this server!")),}
+            axum::response::Json(serde_json::json!(
+                {
+                    "error": {
+                        "message": "The requested resource does not exist on this server!",
+                    }
                 }
             )),
         )

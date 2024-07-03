@@ -1,10 +1,11 @@
 pub mod block;
 pub mod block_results;
-pub mod epoch;
+pub mod error;
 pub mod extracted_masp_tx;
 pub mod header;
 pub mod height;
 pub mod id;
 pub mod indexed_tx;
 pub mod transaction;
+pub mod transactional;
 pub mod tx_index;

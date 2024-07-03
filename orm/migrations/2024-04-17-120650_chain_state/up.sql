@@ -1,5 +1,6 @@
 CREATE TABLE chain_state (
-  block_height SERIAL PRIMARY KEY
+  id SERIAL PRIMARY KEY,
+  block_height INT NOT NULL
 );
 
 CREATE INDEX chain_state_block_height_asc ON chain_state (block_height ASC);

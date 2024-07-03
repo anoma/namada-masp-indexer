@@ -1,9 +1,11 @@
+use anyhow::Context;
 use diesel::{
     BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
     SelectableHelper,
 };
-use orm::schema::{tx};
+use orm::schema::tx;
 use orm::tx::TxDb;
+use shared::error::ContextDbInteractError;
 
 use crate::appstate::AppState;
 
@@ -18,7 +20,7 @@ pub trait TxRepositoryTrait {
         &self,
         from_block_height: i32,
         to_block_height: i32,
-    ) -> Result<Vec<TxDb>, String>;
+    ) -> anyhow::Result<Vec<TxDb>>;
 }
 
 impl TxRepositoryTrait for TxRepository {
@@ -30,8 +32,11 @@ impl TxRepositoryTrait for TxRepository {
         &self,
         from_block_height: i32,
         to_block_height: i32,
-    ) -> Result<Vec<TxDb>, String> {
-        let conn = self.app_state.get_db_connection().await.unwrap();
+    ) -> anyhow::Result<Vec<TxDb>> {
+        let conn = self.app_state.get_db_connection().await.context(
+            "Failed to retrieve connection from the pool of database \
+             connections",
+        )?;
 
         conn.interact(move |conn| {
             tx::table
@@ -42,9 +47,14 @@ impl TxRepositoryTrait for TxRepository {
                 )
                 .select(TxDb::as_select())
                 .get_results(conn)
-                .unwrap_or_default()
+                .with_context(|| {
+                    format!(
+                        "Failed to get transations from the database in the \
+                         range {from_block_height}-{to_block_height}"
+                    )
+                })
         })
         .await
-        .map_err(|e| e.to_string())
+        .context_db_interact_error()?
     }
 }

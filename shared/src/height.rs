@@ -3,12 +3,33 @@ use std::fmt::Display;
 use namada_core::storage::BlockHeight as NamadaBlockHeight;
 use tendermint::block::Height;
 
+pub struct FollowingHeights(BlockHeight);
+
+impl FollowingHeights {
+    pub const fn after(last_height: Option<BlockHeight>) -> Self {
+        match last_height {
+            Some(h) => FollowingHeights(h),
+            None => FollowingHeights(BlockHeight(0)),
+        }
+    }
+}
+
+impl Iterator for FollowingHeights {
+    type Item = BlockHeight;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_height = self.0.next()?;
+        self.0 = next_height;
+        Some(next_height)
+    }
+}
+
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BlockHeight(pub u64);
 
 impl BlockHeight {
-    pub fn next(&self) -> Self {
-        Self(self.0 + 1)
+    pub fn next(&self) -> Option<Self> {
+        self.0.checked_add(1).map(Self)
     }
 }
 

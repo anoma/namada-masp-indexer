@@ -1,12 +1,11 @@
-use diesel::dsl::exists;
-use diesel::{
-    select, BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
-    SelectableHelper,
-};
+use anyhow::Context;
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use orm::schema::witness;
 use orm::witness::WitnessDb;
+use shared::error::ContextDbInteractError;
 
 use crate::appstate::AppState;
+use crate::utils::sql::abs;
 
 #[derive(Clone)]
 pub struct WitnessMapRepository {
@@ -18,10 +17,7 @@ pub trait WitnessMapRepositoryTrait {
     async fn get_witnesses(
         &self,
         block_height: i32,
-        from_index: i32,
-        to_index: i32,
-    ) -> Result<Vec<WitnessDb>, String>;
-    async fn block_height_exist(&self, block_height: i32) -> bool;
+    ) -> anyhow::Result<(Vec<WitnessDb>, i32)>;
 }
 
 impl WitnessMapRepositoryTrait for WitnessMapRepository {
@@ -32,40 +28,40 @@ impl WitnessMapRepositoryTrait for WitnessMapRepository {
     async fn get_witnesses(
         &self,
         block_height: i32,
-        from_index: i32,
-        to_index: i32,
-    ) -> Result<Vec<WitnessDb>, String> {
-        let conn = self.app_state.get_db_connection().await.unwrap();
+    ) -> anyhow::Result<(Vec<WitnessDb>, i32)> {
+        let conn = self.app_state.get_db_connection().await.context(
+            "Failed to retrieve connection from the pool of database \
+             connections",
+        )?;
 
         conn.interact(move |conn| {
-            witness::table
-                .filter(
-                    witness::dsl::block_height.eq(block_height).and(
-                        witness::dsl::witness_idx
-                            .ge(from_index)
-                            .and(witness::dsl::witness_idx.le(to_index)),
-                    ),
-                )
+            let closest_height = witness::table
+                .order(abs(witness::dsl::block_height - block_height).asc())
+                .filter(witness::dsl::block_height.le(block_height))
+                .select(witness::dsl::block_height)
+                .first(conn)
+                .with_context(|| {
+                    format!(
+                        "Failed to fetch height from the db closest to the \
+                         provided height {block_height}"
+                    )
+                })?;
+
+            let witnesses = witness::table
+                .filter(witness::dsl::block_height.eq(closest_height))
                 .select(WitnessDb::as_select())
-                .get_results(conn)
-                .unwrap_or_default()
+                .get_results::<WitnessDb>(conn)
+                .with_context(|| {
+                    format!(
+                        "Failed to fetch witnesses from the db at height \
+                         {closest_height} (the closest to the provided height \
+                         {block_height})"
+                    )
+                })?;
+
+            anyhow::Ok((witnesses, closest_height))
         })
         .await
-        .map_err(|e| e.to_string())
-    }
-
-    async fn block_height_exist(&self, block_height: i32) -> bool {
-        let conn = self.app_state.get_db_connection().await.unwrap();
-
-        conn.interact(move |conn| {
-            select(exists(
-                witness::table
-                    .filter(witness::dsl::block_height.eq(block_height)),
-            ))
-            .get_result(conn)
-            .unwrap_or_default()
-        })
-        .await
-        .unwrap_or_default()
+        .context_db_interact_error()?
     }
 }

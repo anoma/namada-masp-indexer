@@ -15,33 +15,37 @@ paths:
       parameters:
         - in: query
           name: height
+          required: true
           schema:
             type: integer
       responses:
         '200':
-          description: The commitment tree
+          description: The commitment tree at the given height.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TreeResponse'
+  /height:
+    get:
+      responses:
+        '200':
+          description: The last indexed block height.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LatestHeightResponse'
   /notes-map:
     get:
       parameters:
         - in: query
           name: height
+          required: true
           schema:
             type: integer
-        - in: query
-          name: from
-          schema:
-            type: integer
-        - in: query
-          name: size
-          schema:
-            type: integer
+            minimum: 0
       responses:
         '200':
-          description: The notes map between two block heights
+          description: The notes map up to some block height.
           content:
             application/json:
               schema:
@@ -51,23 +55,17 @@ paths:
       parameters:
         - in: query
           name: height
+          required: true
           schema:
             type: integer
-        - in: query
-          name: from
-          schema:
-            type: integer
-        - in: query
-          name: size
-          schema:
-            type: integer
+            minimum: 0
       responses:
         '200':
-          description: The witness map of a specific block height
+          description: The witness map of a specific block height.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TreeResponse'
+                $ref: '#/components/schemas/WitnessMapResponse'
   /tx:
     get:
       parameters:
@@ -76,14 +74,16 @@ paths:
           required: true
           schema:
             type: integer
+            minimum: 0
         - in: query
-          name: size
+          name: height_offset
           required: true
           schema:
             type: integer
+            minimum: 0
       responses:
         '200':
-          description: The masp transactions between two block height
+          description: The masp transactions between `height` and `height + height_offset`.
           content:
             application/json:
               schema:
@@ -100,7 +100,15 @@ components:
           description: The commitment tree bytes.
         block_height:
           type: integer
-          description: The block height of the commitment tree
+          minimum: 0
+          description: The block height of the commitment tree.
+    LatestHeightResponse:
+      type: object
+      properties:
+        block_height:
+          type: integer
+          minimum: 0
+          description: The last indexed block height.
     WitnessMapResponse:
       type: object
       properties:
@@ -115,48 +123,67 @@ components:
                 description: The witness bytes.
               index:
                 type: integer
+                minimum: 0
                 description: The witness index.
           description: The commitment tree bytes.
         block_height:
           type: integer
-          description: The block height of the commitment tree
+          minimum: 0
+          description: The block height of the commitment tree.
     NotesMapResponse:
       type: object
       properties:
-        witnesses:
+        notes_map:
           type: array
           items:
             type: object
             properties:
-              note_positon:
-                type: integer
-                description: The note position.
-              index:
-                type: integer
-                description: The note index.
               is_fee_unshielding:
                 type: boolean
-                description: If this is s fee unshielded.
+                description: Whether this is a fee unshielding.
               block_height:
                 type: integer
-                description: The note block height.
-          description: The vector of notes map
+                minimum: 0
+                description: The block height containing the note.
+              block_index:
+                type: integer
+                minimum: 0
+                description: The block index containing the note.
+              masp_tx_index:
+                type: integer
+                minimum: 0
+                description: The index of the masp tx containing the note in the block.
+              note_position:
+                type: integer
+                minimum: 0
+                description: The note position in the commitment tree.
+          description: The vector of notes map.
     TxResponse:
       type: object
       properties:
-        witnesses:
+        txs:
           type: array
           items:
             type: object
             properties:
-              bytes:
-                type: string
-                format: byte
-                description: The masp transaction bytes.
-              index:
-                type: integer
-                description: The note index.
               block_height:
                 type: integer
+                minimum: 0
                 description: The note block height.
-          description: The vector of masp transactions
+              block_index:
+                type: integer
+                minimum: 0
+                description: The index of the transaction batch in the block.
+              batch:
+                type: object
+                properties:
+                  bytes:
+                    type: string
+                    format: byte
+                    description: The masp transaction bytes.
+                  masp_tx_index:
+                    type: integer
+                    minimum: 0
+                    description: The index of the individual masp transaction in the block.
+                description: The batch of masp transactions in this slot.
+          description: The vector of masp transactions.

@@ -13,8 +13,5 @@ name = "orm"
 path = "src/lib.rs"
 
 [dependencies]
-diesel_migrations.workspace = true
 diesel.workspace = true
-chrono.workspace = true
 serde.workspace = true
-diesel-derive-enum.workspace = true

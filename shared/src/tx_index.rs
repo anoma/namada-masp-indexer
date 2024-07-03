@@ -8,3 +8,7 @@ impl From<NamadaTxIndex> for TxIndex {
         Self(value.0)
     }
 }
+
+/// The order in which a masp tx appears in a Namada tx event.
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MaspTxIndex(pub usize);

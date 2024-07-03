@@ -5,8 +5,4 @@ use validator::Validate;
 pub struct WitnessMapQueryParams {
     #[validate(range(min = 1))]
     pub height: u64,
-    #[validate(range(min = 1))]
-    pub from: u64,
-    #[validate(range(min = 1, max = 30))]
-    pub size: u64,
 }

@@ -1,8 +1,14 @@
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
+use anyhow::Context;
+use diesel::{
+    ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
+    SelectableHelper,
+};
 use orm::schema::commitment_tree;
 use orm::tree::TreeDb;
+use shared::error::ContextDbInteractError;
 
 use crate::appstate::AppState;
+use crate::utils::sql::abs;
 
 #[derive(Clone)]
 pub struct TreeRepository {
@@ -11,11 +17,10 @@ pub struct TreeRepository {
 
 pub trait TreeRepositoryTrait {
     fn new(app_state: AppState) -> Self;
-    async fn get_latest(&self) -> Result<Option<TreeDb>, String>;
     async fn get_at_height(
         &self,
         block_height: i32,
-    ) -> Result<Option<TreeDb>, String>;
+    ) -> anyhow::Result<Option<TreeDb>>;
 }
 
 impl TreeRepositoryTrait for TreeRepository {
@@ -23,37 +28,33 @@ impl TreeRepositoryTrait for TreeRepository {
         Self { app_state }
     }
 
-    async fn get_latest(&self) -> Result<Option<TreeDb>, String> {
-        let conn = self.app_state.get_db_connection().await.unwrap();
-
-        conn.interact(move |conn| {
-            commitment_tree::table
-                .order(commitment_tree::dsl::block_height.desc())
-                .limit(1)
-                .select(TreeDb::as_select())
-                .first(conn)
-                .ok()
-        })
-        .await
-        .map_err(|e| e.to_string())
-    }
-
     async fn get_at_height(
         &self,
         block_height: i32,
-    ) -> Result<Option<TreeDb>, String> {
-        let conn = self.app_state.get_db_connection().await.unwrap();
+    ) -> anyhow::Result<Option<TreeDb>> {
+        let conn = self.app_state.get_db_connection().await.context(
+            "Failed to retrieve connection from the pool of database \
+             connections",
+        )?;
 
         conn.interact(move |conn| {
             commitment_tree::table
-                .filter(commitment_tree::dsl::block_height.eq(block_height))
-                .order(commitment_tree::dsl::block_height.desc())
-                .limit(1)
+                .order(
+                    abs(commitment_tree::dsl::block_height - block_height)
+                        .asc(),
+                )
+                .filter(commitment_tree::dsl::block_height.le(block_height))
                 .select(TreeDb::as_select())
                 .first(conn)
-                .ok()
+                .optional()
+                .with_context(|| {
+                    format!(
+                        "Failed to look-up commitment tree in the database \
+                         closest to the provided height {block_height}"
+                    )
+                })
         })
         .await
-        .map_err(|e| e.to_string())
+        .context_db_interact_error()?
     }
 }

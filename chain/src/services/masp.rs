@@ -10,14 +10,15 @@ use crate::entity::witness_map::WitnessMap;
 /// Update the merkle tree of witnesses the first time we
 /// scan a new MASP transaction.
 pub fn update_witness_map(
-    commitment_tree: CommitmentTree,
-    tx_note_map: TxNoteMap,
-    witness_map: WitnessMap,
+    commitment_tree: &CommitmentTree,
+    tx_note_map: &mut TxNoteMap,
+    witness_map: &WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let mut note_pos = commitment_tree.size();
-    tx_note_map.insert(indexed_tx, note_pos);
+    tx_note_map
+        .insert(indexed_tx, false /* is_fee_unshielding */, note_pos);
 
     for so in shielded
         .sapling_bundle()
@@ -28,13 +29,13 @@ pub fn update_witness_map(
 
         // Update each merkle tree in the witness map with the latest
         // addition
-        witness_map
-            .update(node)
-            .map_err(|()| "note commitment tree is full".to_string())?;
+        witness_map.update(node).map_err(|note_pos| {
+            anyhow::anyhow!("Witness map is full at note position {note_pos}")
+        })?;
 
-        commitment_tree
-            .append(node)
-            .map_err(|()| "note commitment tree is full".to_string())?;
+        if !commitment_tree.append(node) {
+            anyhow::bail!("Note commitment tree is full");
+        }
 
         // Finally, make it easier to construct merkle paths to this new
         // note
