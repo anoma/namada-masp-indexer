@@ -87,3 +87,4 @@ rust-project.json
 
 artifacts/*.json
 masp.sh
+.vscode
