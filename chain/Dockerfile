@@ -1,26 +1,26 @@
-# use the default dart image as the build image
-FROM rust:1.78 AS builder
-
-RUN apt-get update && apt-get install -y protobuf-compiler
-
-# copy the current folder into the build folder
-COPY . /app
-
-# set the work directory
+FROM lukemathwalker/cargo-chef:latest-rust-1.78-bookworm AS chef
 WORKDIR /app
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# build app
+FROM chef AS builder 
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN apt-get update && apt-get install -y protobuf-compiler build-essential clang-tools-14
+
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY . .
 RUN cargo build --release --package chain
 
-# use a slim image
-FROM debian:bookworm-slim
-
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y ca-certificates libpq5
-
-# copy the runtime files
+FROM debian:bookworm-slim AS runtime
+WORKDIR /app
 COPY --from=builder /app/target/release/chain /app/chain
+
+RUN apt-get update && apt-get install -y libpq5
+
 WORKDIR /app
 
 CMD ["./chain"]
