@@ -34,8 +34,8 @@ services:
       context: .
       dockerfile: chain/Dockerfile
     environment:
-      COMETBFT_URL: https://rpc.luminara.icu
-      CHAIN_ID: luminara-position.5eef10f5ab83
+      COMETBFT_URL: <>
+      CHAIN_ID: <>
       DATABASE_URL: postgres://postgres:password@postgres:5432/masp_indexer_local
     depends_on:
       postgres:
