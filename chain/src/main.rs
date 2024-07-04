@@ -46,6 +46,10 @@ async fn main() -> Result<(), MainError> {
 
     let app_state = AppState::new(database_url).into_db_error()?;
 
+    db_service::run_migrations(
+        app_state.get_db_connection().await.into_db_error()?,
+    ).await.into_db_error()?;
+
     let (last_block_height, commitment_tree, witness_map) =
         load_committed_state(&app_state).await?;
 
