@@ -117,8 +117,12 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+<<<<<<< Updated upstream
           file: Dockerfile
           build-args: PACKAGE=${{matrix.docker.package}}
+=======
+          file: ${{ matrix.docker.context }}/Dockerfile
+>>>>>>> Stashed changes
           push: ${{ github.ref == 'refs/heads/master' }}
           tags: ${{ env.REGISTRY_URL }}/anoma/namada-masp-indexer:${{ matrix.docker.image }}-master
           labels: ${{ steps.meta.outputs.labels }}
