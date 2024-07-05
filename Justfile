@@ -6,8 +6,8 @@ help:
 clean:
     cargo clean
 
-fmt:
-    cargo {{nightly_version}} fmt --all
+fmt *CHECK:
+    cargo {{nightly_version}} fmt --all {{ if CHECK == "check" { "-- --check" } else { "" } }}
 
 clippy:
     cargo {{nightly_version}} clippy
