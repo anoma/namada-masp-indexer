@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
 
+use anyhow::Context;
 use clap::Parser;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
@@ -46,11 +47,7 @@ async fn main() -> Result<(), MainError> {
 
     let app_state = AppState::new(database_url).into_db_error()?;
 
-    db_service::run_migrations(
-        app_state.get_db_connection().await.into_db_error()?,
-    )
-    .await
-    .into_db_error()?;
+    run_migrations(&app_state).await?;
 
     let (last_block_height, commitment_tree, witness_map) =
         load_committed_state(&app_state).await?;
@@ -106,6 +103,15 @@ fn must_exit_handle() -> Arc<AtomicBool> {
         task_handle.store(true, atomic::Ordering::Relaxed);
     });
     handle
+}
+
+async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
+    db_service::run_migrations(
+        app_state.get_db_connection().await.into_db_error()?,
+    )
+    .await
+    .context("Failed to run db migrations")
+    .into_db_error()
 }
 
 async fn load_committed_state(
