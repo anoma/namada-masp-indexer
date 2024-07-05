@@ -65,7 +65,7 @@ jobs:
           toolchain: nightly-2024-05-15
           components: rustfmt
           cache: true
-      - run: just fmt
+      - run: just fmt check
 
   build:
     if: ${{ github.event_name == 'pull_request' }}

@@ -1,19 +1,19 @@
 nightly_version := prepend('+', `cat rust-nightly-version`)
 
 help:
-    @echo fmt, clippy, clippy-fix, check or clean
+    @echo Available commands: `just --summary`
 
 clean:
     cargo clean
 
-fmt:
-    cargo {{nightly_version}} fmt --all
+fmt *CHECK:
+    cargo {{ nightly_version }} fmt --all {{ if CHECK == "check" { "-- --check" } else { "" } }}
 
 clippy:
-    cargo {{nightly_version}} clippy
+    cargo {{ nightly_version }} clippy
 
 clippy-fix:
-    cargo {{nightly_version}} clippy --fix --allow-dirty --allow-staged
+    cargo {{ nightly_version }} clippy --fix --allow-dirty --allow-staged
 
 check:
     cargo check
