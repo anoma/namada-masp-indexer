@@ -185,7 +185,7 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
     use diesel::prelude::*;
     use schema::tx::dsl::*;
 
-    tracing::info!("Building new block index");
+    tracing::info!("Starting new masp txs block index");
 
     tracing::debug!("Reading all block heights with masp transactions from db");
 
@@ -257,7 +257,7 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
 
     tracing::info!(
         num_blocks_with_masp_txs = block_heights_len,
-        "Built and stored new block index"
+        "Built and stored new masp txs block index"
     );
 
     Ok(())
