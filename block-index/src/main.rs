@@ -204,7 +204,9 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
                         "Failed to get tx block height row data from db",
                     )?;
                     tracing::debug!("Read block height entry from db");
-                    accum.push(height as u64);
+                    accum.push(u64::try_from(height).context(
+                        "Failed to convert block height from i32 to u64",
+                    )?);
                     anyhow::Ok(accum)
                 })
         })
