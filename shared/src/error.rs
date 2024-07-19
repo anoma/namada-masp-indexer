@@ -26,6 +26,16 @@ pub trait IntoMainError<T>: Sized {
     fn into_main_error(self, description: &str) -> Result<T, MainError>;
 
     #[inline]
+    fn into_conversion_error(self) -> Result<T, MainError> {
+        self.into_main_error("Conversion error")
+    }
+
+    #[inline]
+    fn into_serialization_error(self) -> Result<T, MainError> {
+        self.into_main_error("Serialization error")
+    }
+
+    #[inline]
     fn into_rpc_error(self) -> Result<T, MainError> {
         self.into_main_error("RPC error")
     }
