@@ -221,7 +221,7 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
         "Read all block heights with masp transactions from db"
     );
 
-    let _serialized_filter = {
+    let _serialized_filter = tokio::task::block_in_place(|| {
         tracing::debug!(
             "Building binary fuse xor filter of all heights with masp \
              transactions"
@@ -248,8 +248,8 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
             "Binary fuse xor filter built"
         );
 
-        serialized
-    };
+        Ok(serialized)
+    })?;
 
     tracing::debug!("Storing binary fuse xor filter in db");
     // TODO: store filter in db
