@@ -130,6 +130,7 @@ fn must_exit() -> impl Future<Output = ()> {
         };
         tracing::info!(which = signal_descriptor, "Signal received");
 
+        atomic::fence(atomic::Ordering::Release);
         task_handle.flag.store(true, atomic::Ordering::Relaxed);
 
         let waker = task_handle.waker.lock().unwrap().take();
@@ -140,6 +141,7 @@ fn must_exit() -> impl Future<Output = ()> {
 
     future::poll_fn(move |cx| {
         if fut_handle.flag.load(atomic::Ordering::Relaxed) {
+            atomic::fence(atomic::Ordering::Acquire);
             Poll::Ready(())
         } else {
             *fut_handle.waker.lock().unwrap() = Some(cx.waker().clone());
