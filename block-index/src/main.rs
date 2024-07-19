@@ -102,11 +102,16 @@ where
 }
 
 fn must_exit() -> impl Future<Output = ()> {
-    let fut_flag = Arc::new(AtomicBool::new(false));
-    let task_flag = Arc::clone(&fut_flag);
+    struct ExitHandle {
+        flag: AtomicBool,
+        waker: Mutex<Option<Waker>>,
+    }
 
-    let fut_waker = Arc::new(Mutex::new(None));
-    let task_waker = Arc::clone(&fut_waker);
+    let fut_handle = Arc::new(ExitHandle {
+        flag: AtomicBool::new(false),
+        waker: Mutex::new(None),
+    });
+    let task_handle = Arc::clone(&fut_handle);
 
     tokio::spawn(async move {
         let mut interrupt =
@@ -125,19 +130,19 @@ fn must_exit() -> impl Future<Output = ()> {
         };
         tracing::info!(which = signal_descriptor, "Signal received");
 
-        task_flag.store(true, atomic::Ordering::Relaxed);
+        task_handle.flag.store(true, atomic::Ordering::Relaxed);
 
-        let waker: Option<Waker> = task_waker.lock().unwrap().take();
+        let waker = task_handle.waker.lock().unwrap().take();
         if let Some(waker) = waker {
             waker.wake();
         }
     });
 
     future::poll_fn(move |cx| {
-        if fut_flag.load(atomic::Ordering::Relaxed) {
+        if fut_handle.flag.load(atomic::Ordering::Relaxed) {
             Poll::Ready(())
         } else {
-            *fut_waker.lock().unwrap() = Some(cx.waker().clone());
+            *fut_handle.waker.lock().unwrap() = Some(cx.waker().clone());
             Poll::Pending
         }
     })
