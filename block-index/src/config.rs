@@ -1,5 +1,6 @@
 use clap_verbosity_flag::{InfoLevel, LevelFilter, Verbosity};
 use tracing::Level;
+use tracing_appender::non_blocking::NonBlocking;
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(clap::Parser)]
@@ -11,7 +12,10 @@ pub struct AppConfig {
     pub verbosity: Verbosity<InfoLevel>,
 }
 
-pub fn install_tracing_subscriber(verbosity: Verbosity<InfoLevel>) {
+pub fn install_tracing_subscriber(
+    verbosity: Verbosity<InfoLevel>,
+    non_blocking_logger: NonBlocking,
+) {
     let log_level = match verbosity.log_level_filter() {
         LevelFilter::Off => None,
         LevelFilter::Error => Some(Level::ERROR),
@@ -21,8 +25,10 @@ pub fn install_tracing_subscriber(verbosity: Verbosity<InfoLevel>) {
         LevelFilter::Trace => Some(Level::TRACE),
     };
     if let Some(log_level) = log_level {
-        let subscriber =
-            FmtSubscriber::builder().with_max_level(log_level).finish();
+        let subscriber = FmtSubscriber::builder()
+            .with_max_level(log_level)
+            .with_writer(non_blocking_logger)
+            .finish();
         tracing::subscriber::set_global_default(subscriber).unwrap();
     }
 }

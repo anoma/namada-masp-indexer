@@ -39,6 +39,7 @@ tokio-retry = "0.3"
 tower = { version = "0.4", features = [ "util", "timeout", "load-shed", "limit", "buffer" ] }
 tower-http = { version = "0.4.4", features = [ "compression-full", "limit", "trace", "cors" ] }
 tracing = "0.1"
+tracing-appender = "0.2.0"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 validator = { version = "0.16.0", features = ["derive"] }
 xorf = { version = "0.11.0", features = ["serde"]}

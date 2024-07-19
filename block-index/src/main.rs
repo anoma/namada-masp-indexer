@@ -2,6 +2,7 @@ pub mod appstate;
 pub mod config;
 
 use std::future::{self, Future};
+use std::ops::ControlFlow;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::{Arc, Mutex};
 use std::task::{Poll, Waker};
@@ -23,6 +24,13 @@ const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
 
 // TODO: add db migrations for block index
 
+macro_rules! exit {
+    () => {{
+        tracing::info!("Exiting...");
+        return Ok(());
+    }};
+}
+
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     let AppConfig {
@@ -30,15 +38,53 @@ async fn main() -> Result<(), MainError> {
         database_url,
     } = AppConfig::parse();
 
-    config::install_tracing_subscriber(verbosity);
+    let (non_blocking_logger, _worker) =
+        tracing_appender::non_blocking(std::io::stdout());
+    config::install_tracing_subscriber(verbosity, non_blocking_logger);
 
     tracing::info!(version = VERSION_STRING, "Started the block index builder");
     let mut exit_handle = must_exit();
 
     let app_state = AppState::new(database_url).into_db_error()?;
 
-    run_migrations(&app_state).await?;
+    if wait_for_migrations(&mut exit_handle, &app_state)
+        .await
+        .is_break()
+    {
+        exit!();
+    }
+    build_block_indexes(&mut exit_handle, &app_state).await;
 
+    exit!();
+}
+
+async fn wait_for_migrations<F>(
+    mut exit_handle: F,
+    app_state: &AppState,
+) -> ControlFlow<()>
+where
+    F: Future<Output = ()> + Unpin,
+{
+    while run_migrations(app_state).await.is_err() {
+        const SLEEP_AMOUNT: Duration = Duration::from_secs(5);
+
+        tracing::info!(after = ?SLEEP_AMOUNT, "Retrying migrations");
+
+        tokio::select! {
+            _ = &mut exit_handle => {
+                return ControlFlow::Break(());
+            }
+            _ = sleep(SLEEP_AMOUNT) => {}
+        }
+    }
+
+    ControlFlow::Continue(())
+}
+
+async fn build_block_indexes<F>(mut exit_handle: F, app_state: &AppState)
+where
+    F: Future<Output = ()> + Unpin,
+{
     loop {
         const SLEEP_AMOUNT: Duration = Duration::from_secs(30 * 60);
 
@@ -46,16 +92,13 @@ async fn main() -> Result<(), MainError> {
 
         tokio::select! {
             _ = &mut exit_handle => {
-                break;
+                return;
             }
             _ = sleep(SLEEP_AMOUNT) => {
-                _ = build_new_block_index(&app_state).await;
+                _ = build_new_block_index(app_state).await;
             }
         }
     }
-
-    tracing::info!("Exiting...");
-    Ok(())
 }
 
 fn must_exit() -> impl Future<Output = ()> {
@@ -75,17 +118,12 @@ fn must_exit() -> impl Future<Output = ()> {
         let mut quit = signal::unix::signal(signal::unix::SignalKind::quit())
             .expect("Failed to install QUIT signal handler");
 
-        tokio::select! {
-            _ = interrupt.recv() => {
-                tracing::info!("INT signal received");
-            }
-            _ = term.recv() => {
-                tracing::info!("TERM signal received");
-            }
-            _ = quit.recv() => {
-                tracing::info!("QUIT signal received");
-            }
-        }
+        let signal_descriptor = tokio::select! {
+            _ = interrupt.recv() => "INT",
+            _ = term.recv() => "TERM",
+            _ = quit.recv() => "QUIT",
+        };
+        tracing::info!(which = signal_descriptor, "Signal received");
 
         task_flag.store(true, atomic::Ordering::Relaxed);
 

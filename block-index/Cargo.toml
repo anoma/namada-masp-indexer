@@ -23,6 +23,7 @@ diesel_migrations.workspace = true
 orm.workspace = true
 shared.workspace = true
 tokio.workspace = true 
+tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 xorf.workspace = true
