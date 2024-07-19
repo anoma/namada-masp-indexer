@@ -88,7 +88,7 @@ where
     loop {
         const SLEEP_AMOUNT: Duration = Duration::from_secs(30 * 60);
 
-        tracing::debug!(sleep = ?SLEEP_AMOUNT, "Waiting to build new block index...");
+        tracing::debug!(after = ?SLEEP_AMOUNT, "Building new block index");
 
         tokio::select! {
             _ = &mut exit_handle => {
