@@ -142,6 +142,8 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
 
     tracing::info!("Building new block index");
 
+    tracing::debug!("Reading all block heights with masp transactions from db");
+
     let block_heights = app_state
         .get_db_connection()
         .await
@@ -165,14 +167,19 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
         .context_db_interact_error()
         .into_db_error()?
         .into_db_error()?;
-    let block_heights_len = block_heights.len();
 
+    let block_heights_len = block_heights.len();
     tracing::debug!(
-        num_heights = block_heights_len,
-        "Building index of all heights with masp transactions"
+        num_blocks_with_masp_txs = block_heights_len,
+        "Read all block heights with masp transactions from db"
     );
 
-    let (index_len, _serialized_filter) = {
+    let _serialized_filter = {
+        tracing::debug!(
+            "Building binary fuse xor filter of all heights with masp \
+             transactions"
+        );
+
         let filter: BinaryFuse16 = block_heights
             .try_into()
             .map_err(|err| {
@@ -189,15 +196,20 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
             )
             .into_serialization_error()?;
 
-        (filter.len(), serialized)
+        tracing::debug!(
+            index_len = filter.len(),
+            "Binary fuse xor filter built"
+        );
+
+        serialized
     };
 
-    tracing::debug!(index_len, "New block index built");
-
+    tracing::debug!("Storing binary fuse xor filter in db");
     // TODO: store filter in db
+    tracing::debug!("Stored binary fuse xor filter in db");
 
     tracing::info!(
-        num_heights = block_heights_len,
+        num_blocks_with_masp_txs = block_heights_len,
         "Built and stored new block index"
     );
 
