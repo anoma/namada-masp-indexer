@@ -31,7 +31,7 @@ macro_rules! exit {
     }};
 }
 
-#[tokio::main]
+#[tokio::main(worker_threads = 2)]
 async fn main() -> Result<(), MainError> {
     let AppConfig {
         verbosity,
