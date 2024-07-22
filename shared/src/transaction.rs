@@ -3,11 +3,9 @@ use std::fmt::Display;
 
 use namada_core::borsh::BorshDeserialize;
 use namada_core::collections::HashMap;
-use namada_core::hash::Hash;
+use namada_core::masp::TxId;
 use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
-use namada_sdk::token::{
-    ShieldedTransfer, ShieldingTransfer, UnshieldingTransfer,
-};
+use namada_sdk::token::Transfer;
 use namada_tx::{Data, Section, Tx as NamadaTx, TxCommitments};
 
 use crate::id::Id;
@@ -23,7 +21,7 @@ pub struct Transaction {
 impl Transaction {
     pub fn from_namada_tx(
         nam_tx_bytes: &[u8],
-        valid_masp_tx_sechashes: &[Hash],
+        valid_masp_tx_ids: &[TxId],
     ) -> Option<Self> {
         // TODO: handle IBC masp?
 
@@ -38,31 +36,29 @@ impl Transaction {
             .iter()
             .enumerate()
             .filter_map(|(masp_tx_index, cmt)| {
-                let masp_tx_section_hash =
-                    get_shielded_tx_sechash(&transaction, cmt)?;
-                Some((masp_tx_section_hash, MaspTxIndex(masp_tx_index)))
+                let masp_tx_id = get_shielded_tx_id(&transaction, cmt)?;
+                Some((masp_tx_id, MaspTxIndex(masp_tx_index)))
             })
             .collect();
 
-        let masp_txs = valid_masp_tx_sechashes
+        let masp_txs = valid_masp_tx_ids
             .iter()
-            .filter_map(|section_hash| {
-                let Some(Cow::Borrowed(Section::MaspTx(masp_tx))) =
-                    transaction.get_section(section_hash)
+            .filter_map(|masp_tx_id| {
+                let Some(masp_tx) = transaction.get_masp_section(masp_tx_id)
                 else {
                     tracing::warn!(
                         %transaction_id,
-                        %section_hash,
+                        ?masp_tx_id,
                         "Shielded tx not found in Namada transaction"
                     );
                     return None;
                 };
 
                 let masp_tx_index =
-                    all_masp_txs.get(section_hash).cloned().or_else(|| {
+                    all_masp_txs.get(masp_tx_id).cloned().or_else(|| {
                         tracing::warn!(
                             %transaction_id,
-                            %section_hash,
+                            ?masp_tx_id,
                             ?masp_tx,
                             "Shielded tx not found in Namada transaction"
                         );
@@ -87,33 +83,17 @@ impl Display for Transaction {
     }
 }
 
-fn get_shielded_tx_sechash(
+fn get_shielded_tx_id(
     transaction: &NamadaTx,
     cmt: &TxCommitments,
-) -> Option<Hash> {
+) -> Option<TxId> {
     let Some(Cow::Borrowed(Section::Data(Data { data: tx_data, .. }))) =
         transaction.get_section(&cmt.data_hash)
     else {
         return None;
     };
 
-    let shielded_transfer = || {
-        let data = ShieldedTransfer::try_from_slice(tx_data).ok()?;
-        transaction.get_section(&data.section_hash)?;
-        Some(data.section_hash)
-    };
-    let unshielding_transfer = || {
-        let data = UnshieldingTransfer::try_from_slice(tx_data).ok()?;
-        transaction.get_section(&data.shielded_section_hash)?;
-        Some(data.shielded_section_hash)
-    };
-    let shielding_transfer = || {
-        let data = ShieldingTransfer::try_from_slice(tx_data).ok()?;
-        transaction.get_section(&data.shielded_section_hash)?;
-        Some(data.shielded_section_hash)
-    };
-
-    shielded_transfer()
-        .or_else(unshielding_transfer)
-        .or_else(shielding_transfer)
+    Transfer::try_from_slice(tx_data)
+        .ok()
+        .and_then(|tx| tx.shielded_section_hash)
 }
