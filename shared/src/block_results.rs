@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
-use namada_core::hash::Hash;
+use namada_core::masp::TxId;
 use namada_sdk::events::extend::{
     MaspTxBatchRefs, MaspTxBlockIndex, ReadFromEventAttributes,
 };
 use tendermint_rpc::endpoint::block_results;
 
 pub struct IndexedMaspTxs {
-    /// Mapping of block indexes to valid masp tx section hashes.
-    pub locations: BTreeMap<usize, Vec<Hash>>,
+    /// Mapping of block indexes to valid masp tx ids.
+    pub locations: BTreeMap<usize, Vec<TxId>>,
 }
 
 pub fn locate_masp_txs(
