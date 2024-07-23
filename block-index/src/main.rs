@@ -2,6 +2,7 @@ pub mod appstate;
 pub mod config;
 
 use std::future::{self, Future};
+use std::num::NonZeroU64;
 use std::ops::ControlFlow;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::{Arc, Mutex};
@@ -37,6 +38,7 @@ async fn main() -> Result<(), MainError> {
     let AppConfig {
         verbosity,
         database_url,
+        interval,
     } = AppConfig::parse();
 
     let (non_blocking_logger, _worker) =
@@ -54,7 +56,7 @@ async fn main() -> Result<(), MainError> {
     {
         exit!();
     }
-    build_block_indexes(&mut exit_handle, &app_state).await;
+    build_block_indexes(&mut exit_handle, interval, &app_state).await;
 
     exit!();
 }
@@ -82,20 +84,26 @@ where
     ControlFlow::Continue(())
 }
 
-async fn build_block_indexes<F>(mut exit_handle: F, app_state: &AppState)
-where
+async fn build_block_indexes<F>(
+    mut exit_handle: F,
+    interval: Option<NonZeroU64>,
+    app_state: &AppState,
+) where
     F: Future<Output = ()> + Unpin,
 {
-    loop {
-        const SLEEP_AMOUNT: Duration = Duration::from_secs(30 * 60);
+    const DEFAULT_SLEEP_AMOUNT: Duration = Duration::from_secs(30 * 60);
+    let sleep_amount = interval
+        .map(|interval| Duration::from_secs(interval.get()))
+        .unwrap_or(DEFAULT_SLEEP_AMOUNT);
 
-        tracing::debug!(after = ?SLEEP_AMOUNT, "Building new block index");
+    loop {
+        tracing::debug!(after = ?sleep_amount, "Building new block index");
 
         tokio::select! {
             _ = &mut exit_handle => {
                 return;
             }
-            _ = sleep(SLEEP_AMOUNT) => {
+            _ = sleep(sleep_amount) => {
                 _ = build_new_block_index(app_state).await;
             }
         }
