@@ -24,8 +24,6 @@ use crate::config::AppConfig;
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
 
-// TODO: add db migrations for block index
-
 macro_rules! exit {
     () => {{
         tracing::info!("Exiting...");
