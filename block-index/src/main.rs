@@ -11,6 +11,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use deadpool_diesel::postgres::Object;
+use orm::block_index::BlockIndex;
 use orm::schema;
 use shared::error::{ContextDbInteractError, IntoMainError, MainError};
 use tokio::signal;
@@ -183,17 +184,17 @@ async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
 async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
     use diesel::connection::DefaultLoadingMode as DbDefaultLoadingMode;
     use diesel::prelude::*;
-    use schema::tx::dsl::*;
 
     tracing::info!("Starting new masp txs block index");
 
     tracing::debug!("Reading all block heights with masp transactions from db");
 
-    let block_heights = app_state
-        .get_db_connection()
-        .await
-        .into_db_error()?
+    let conn = app_state.get_db_connection().await.into_db_error()?;
+
+    let block_heights = conn
         .interact(|conn| {
+            use schema::tx::dsl::*;
+
             tx.select(block_height)
                 .distinct()
                 .load_iter::<_, DbDefaultLoadingMode>(conn)
@@ -221,7 +222,7 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
         "Read all block heights with masp transactions from db"
     );
 
-    let _serialized_filter = tokio::task::block_in_place(|| {
+    let serialized_filter = tokio::task::block_in_place(|| {
         tracing::debug!(
             "Building binary fuse xor filter of all heights with masp \
              transactions"
@@ -252,7 +253,30 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
     })?;
 
     tracing::debug!("Storing binary fuse xor filter in db");
-    // TODO: store filter in db
+
+    conn.interact(|conn| {
+        use schema::block_index::dsl::*;
+
+        let db_filter = BlockIndex {
+            id: 0,
+            serialized_data: serialized_filter,
+        };
+
+        diesel::insert_into(block_index)
+            .values(&db_filter)
+            .on_conflict(id)
+            .do_update()
+            .set(serialized_data.eq(&db_filter.serialized_data))
+            .execute(conn)
+            .context("Failed to insert masp txs block index into db")?;
+
+        anyhow::Ok(())
+    })
+    .await
+    .context_db_interact_error()
+    .into_db_error()?
+    .into_db_error()?;
+
     tracing::debug!("Stored binary fuse xor filter in db");
 
     tracing::info!(
