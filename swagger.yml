@@ -5,6 +5,15 @@ info:
 servers:
   - url: https://localhost:5000/api/v1
 paths:
+  /block-index:
+    get:
+      responses:
+        '200':
+          description: Compressed (lossy) index of all blocks containing masp txs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockIndexResponse'
   /health:
     get:
       responses:
@@ -187,3 +196,22 @@ components:
                     description: The index of the individual masp transaction in the block.
                 description: The batch of masp transactions in this slot.
           description: The vector of masp transactions.
+    BlockIndexResponse:
+      type: object
+      properties:
+        index:
+          description: Compressed (lossy) index of all blocks containing masp txs.
+          type: object
+          properties:
+            seed:
+              type: integer
+            segment_length:
+              type: integer
+            segment_length_mask:
+              type: integer
+            segment_count_length:
+              type: integer
+            fingerprints:
+              type: array
+              items:
+                type: integer
