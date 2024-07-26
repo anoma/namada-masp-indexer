@@ -5,7 +5,7 @@ use axum_trace_id::TraceId;
 use shared::error::InspectWrap;
 
 use crate::error::namada_state::NamadaStateError;
-use crate::response::namada_state::LatestHeightResponse;
+use crate::response::namada_state::{BlockIndexResponse, LatestHeightResponse};
 use crate::state::common::CommonState;
 
 #[debug_handler]
@@ -24,4 +24,24 @@ pub async fn get_latest_height(
     Ok(Json(LatestHeightResponse {
         block_height: maybe_height.map(|h| h.0).unwrap_or_default(),
     }))
+}
+
+#[debug_handler]
+pub async fn get_block_index(
+    _trace_id: TraceId<String>,
+    State(state): State<CommonState>,
+) -> Result<Json<BlockIndexResponse>, NamadaStateError> {
+    let maybe_block_index = state
+        .namada_state_service
+        .get_block_index()
+        .await
+        .inspect_wrap("get_block_index", |err| {
+            NamadaStateError::Database(err.to_string())
+        })?;
+
+    if let Some(index) = maybe_block_index {
+        Ok(Json(BlockIndexResponse { index }))
+    } else {
+        Err(NamadaStateError::BlockIndexNotFound)
+    }
 }

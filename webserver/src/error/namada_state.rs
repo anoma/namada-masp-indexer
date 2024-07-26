@@ -6,6 +6,8 @@ use crate::response::api::ApiErrorResponse;
 
 #[derive(Error, Debug)]
 pub enum NamadaStateError {
+    #[error("Block index not found")]
+    BlockIndexNotFound,
     #[error("Database error: {0}")]
     Database(String),
 }
@@ -13,6 +15,7 @@ pub enum NamadaStateError {
 impl IntoResponse for NamadaStateError {
     fn into_response(self) -> Response {
         let status_code = match self {
+            NamadaStateError::BlockIndexNotFound => StatusCode::NOT_FOUND,
             NamadaStateError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 

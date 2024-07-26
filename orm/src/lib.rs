@@ -1,3 +1,4 @@
+pub mod block_index;
 pub mod chain_state;
 pub mod notes_map;
 pub mod schema;

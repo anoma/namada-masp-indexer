@@ -22,4 +22,10 @@ impl NamadaStateService {
     ) -> anyhow::Result<Option<BlockHeight>> {
         self.namada_state_repo.get_latest_height().await
     }
+
+    pub async fn get_block_index(
+        &self,
+    ) -> anyhow::Result<Option<xorf::BinaryFuse16>> {
+        self.namada_state_repo.get_block_index().await
+    }
 }

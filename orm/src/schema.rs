@@ -1,6 +1,13 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    block_index (id) {
+        id -> Int4,
+        serialized_data -> Bytea,
+    }
+}
+
+diesel::table! {
     chain_state (id) {
         id -> Int4,
         block_height -> Int4,
@@ -45,6 +52,7 @@ diesel::table! {
 }
 
 diesel::allow_tables_to_appear_in_same_query!(
+    block_index,
     chain_state,
     commitment_tree,
     notes_map,
