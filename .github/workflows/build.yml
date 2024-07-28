@@ -99,6 +99,7 @@ jobs:
           [
             { image: chain, context: chain },
             { image: webserver, context: webserver },
+            { image: block-index-builder, context: block-index },
           ]
 
     steps:
