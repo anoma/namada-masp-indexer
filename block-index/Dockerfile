@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y protobuf-compiler build-essential clang
 RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
-RUN cargo build --release --package block-index-builder
+RUN cargo build --release --package block-index
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
