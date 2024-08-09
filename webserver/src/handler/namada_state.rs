@@ -39,8 +39,11 @@ pub async fn get_block_index(
             NamadaStateError::Database(err.to_string())
         })?;
 
-    if let Some(index) = maybe_block_index {
-        Ok(Json(BlockIndexResponse { index }))
+    if let Some((height, index)) = maybe_block_index {
+        Ok(Json(BlockIndexResponse {
+            block_height: height.0,
+            index,
+        }))
     } else {
         Err(NamadaStateError::BlockIndexNotFound)
     }

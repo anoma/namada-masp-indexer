@@ -4,6 +4,7 @@ diesel::table! {
     block_index (id) {
         id -> Int4,
         serialized_data -> Bytea,
+        block_height -> Int4,
     }
 }
 

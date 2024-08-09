@@ -8,5 +8,6 @@ pub struct LatestHeightResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockIndexResponse {
+    pub block_height: u64,
     pub index: BinaryFuse16,
 }

@@ -17,7 +17,9 @@ pub trait NamadaStateRepositoryTrait {
 
     async fn get_latest_height(&self) -> anyhow::Result<Option<BlockHeight>>;
 
-    async fn get_block_index(&self) -> anyhow::Result<Option<BinaryFuse16>>;
+    async fn get_block_index(
+        &self,
+    ) -> anyhow::Result<Option<(i32, BinaryFuse16)>>;
 }
 
 impl NamadaStateRepositoryTrait for NamadaStateRepository {
@@ -46,13 +48,15 @@ impl NamadaStateRepositoryTrait for NamadaStateRepository {
         Ok(block_height.map(BlockHeight::from))
     }
 
-    async fn get_block_index(&self) -> anyhow::Result<Option<BinaryFuse16>> {
+    async fn get_block_index(
+        &self,
+    ) -> anyhow::Result<Option<(i32, BinaryFuse16)>> {
         let conn = self.app_state.get_db_connection().await.context(
             "Failed to retrieve connection from the pool of database \
              connections",
         )?;
 
-        let maybe_serialized_data = conn
+        let maybe_index = conn
             .interact(move |conn| {
                 use orm::block_index::BlockIndex;
                 use orm::schema::block_index::dsl::block_index;
@@ -65,8 +69,12 @@ impl NamadaStateRepositoryTrait for NamadaStateRepository {
                         .context("Failed to get latest block index from db")?
                         .map(
                             |BlockIndex {
-                                 serialized_data, ..
-                             }| serialized_data,
+                                 block_height,
+                                 serialized_data,
+                                 ..
+                             }| {
+                                (block_height, serialized_data)
+                            },
                         ),
                 )
             })
@@ -74,12 +82,13 @@ impl NamadaStateRepositoryTrait for NamadaStateRepository {
             .context_db_interact_error()??;
 
         tokio::task::block_in_place(|| {
-            maybe_serialized_data
-                .map(|data| {
-                    bincode::deserialize(&data).context(
+            maybe_index
+                .map(|(height, data)| {
+                    let filter = bincode::deserialize(&data).context(
                         "Failed to deserialize block index data returned from \
                          db",
-                    )
+                    )?;
+                    anyhow::Ok((height, filter))
                 })
                 .transpose()
         })

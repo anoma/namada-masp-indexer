@@ -25,7 +25,13 @@ impl NamadaStateService {
 
     pub async fn get_block_index(
         &self,
-    ) -> anyhow::Result<Option<xorf::BinaryFuse16>> {
-        self.namada_state_repo.get_block_index().await
+    ) -> anyhow::Result<Option<(BlockHeight, xorf::BinaryFuse16)>> {
+        self.namada_state_repo
+            .get_block_index()
+            .await
+            .map(|option| {
+                option
+                    .map(|(height, filter)| (BlockHeight(height as _), filter))
+            })
     }
 }

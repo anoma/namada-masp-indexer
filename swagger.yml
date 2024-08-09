@@ -199,6 +199,10 @@ components:
     BlockIndexResponse:
       type: object
       properties:
+        block_height:
+          type: integer
+          minimum: 0
+          description: The block height of the index.
         index:
           description: Compressed (lossy) index of all blocks containing masp txs.
           type: object
