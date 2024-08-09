@@ -197,32 +197,58 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
 
     let conn = app_state.get_db_connection().await.into_db_error()?;
 
-    let block_heights = conn
+    let (last_height, block_heights_with_txs) = conn
         .interact(|conn| {
-            use schema::tx::dsl::*;
+            conn.build_transaction().read_only().run(|conn| {
+                let last_height = {
+                    use diesel::prelude::OptionalExtension;
+                    use schema::chain_state::dsl::*;
 
-            tx.select(block_height)
-                .distinct()
-                .load_iter::<_, DbDefaultLoadingMode>(conn)
-                .context("Failed to query block heights with masp txs")?
-                .try_fold(Vec::new(), |mut accum, maybe_block_height| {
-                    tracing::debug!("Reading block height entry from db");
-                    let height: i32 = maybe_block_height.context(
-                        "Failed to get tx block height row data from db",
-                    )?;
-                    tracing::debug!("Read block height entry from db");
-                    accum.push(u64::try_from(height).context(
-                        "Failed to convert block height from i32 to u64",
-                    )?);
-                    anyhow::Ok(accum)
-                })
+                    chain_state
+                        .select(block_height)
+                        .first(conn)
+                        .optional()
+                        .context("Failed to query last block height")
+                }?;
+
+                let block_heights_with_txs = {
+                    use schema::tx::dsl::*;
+
+                    tx.select(block_height)
+                        .distinct()
+                        .load_iter::<_, DbDefaultLoadingMode>(conn)
+                        .context("Failed to query block heights with masp txs")?
+                        .try_fold(
+                            Vec::new(),
+                            |mut accum, maybe_block_height| {
+                                tracing::debug!(
+                                    "Reading block height entry from db"
+                                );
+                                let height: i32 = maybe_block_height.context(
+                                    "Failed to get tx block height row data \
+                                     from db",
+                                )?;
+                                tracing::debug!(
+                                    "Read block height entry from db"
+                                );
+                                accum.push(u64::try_from(height).context(
+                                    "Failed to convert block height from i32 \
+                                     to u64",
+                                )?);
+                                anyhow::Ok(accum)
+                            },
+                        )
+                }?;
+
+                anyhow::Ok((last_height, block_heights_with_txs))
+            })
         })
         .await
         .context_db_interact_error()
         .into_db_error()?
         .into_db_error()?;
 
-    let block_heights_len = block_heights.len();
+    let block_heights_len = block_heights_with_txs.len();
     tracing::debug!(
         num_blocks_with_masp_txs = block_heights_len,
         "Read all block heights with masp transactions from db"
@@ -234,7 +260,7 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
              transactions"
         );
 
-        let filter: BinaryFuse16 = block_heights
+        let filter: BinaryFuse16 = block_heights_with_txs
             .try_into()
             .map_err(|err| {
                 anyhow!(
@@ -260,19 +286,23 @@ async fn build_new_block_index(app_state: &AppState) -> Result<(), MainError> {
 
     tracing::debug!("Storing binary fuse xor filter in db");
 
-    conn.interact(|conn| {
+    conn.interact(move |conn| {
         use schema::block_index::dsl::*;
 
         let db_filter = BlockIndex {
             id: 0,
             serialized_data: serialized_filter,
+            block_height: last_height.unwrap_or_default(),
         };
 
         diesel::insert_into(block_index)
             .values(&db_filter)
             .on_conflict(id)
             .do_update()
-            .set(serialized_data.eq(&db_filter.serialized_data))
+            .set((
+                block_height.eq(&db_filter.block_height),
+                serialized_data.eq(&db_filter.serialized_data),
+            ))
             .execute(conn)
             .context("Failed to insert masp txs block index into db")?;
 

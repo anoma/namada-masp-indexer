@@ -8,4 +8,5 @@ use crate::schema::block_index;
 pub struct BlockIndex {
     pub id: i32,
     pub serialized_data: Vec<u8>,
+    pub block_height: i32,
 }
