@@ -1,9 +1,9 @@
 use anyhow::Context;
 use diesel::{
-    BoolExpressionMethods, ExpressionMethods, QueryDsl, RunQueryDsl,
-    SelectableHelper,
+    BoolExpressionMethods, ExpressionMethods, OptionalExtension, QueryDsl,
+    RunQueryDsl, SelectableHelper,
 };
-use orm::schema::tx;
+use orm::schema::{chain_state, tx};
 use orm::tx::TxDb;
 use shared::error::ContextDbInteractError;
 
@@ -39,20 +39,38 @@ impl TxRepositoryTrait for TxRepository {
         )?;
 
         conn.interact(move |conn| {
-            tx::table
-                .filter(
-                    tx::dsl::block_height
-                        .ge(from_block_height)
-                        .and(tx::dsl::block_height.le(to_block_height)),
-                )
-                .select(TxDb::as_select())
-                .get_results(conn)
-                .with_context(|| {
-                    format!(
-                        "Failed to get transations from the database in the \
-                         range {from_block_height}-{to_block_height}"
+            conn.build_transaction().read_only().run(move |conn| {
+                let block_height: i32 = chain_state::table
+                    .select(chain_state::dsl::block_height)
+                    .get_result(conn)
+                    .optional()
+                    .with_context(|| {
+                        "Failed to get the latest block height from the \
+                         database"
+                    })?
+                    .unwrap_or_default();
+                if block_height < to_block_height {
+                    anyhow::bail!(
+                        "Requested range {from_block_height} -- \
+                         {to_block_height} exceeds latest block height \
+                         ({block_height})."
                     )
-                })
+                }
+                tx::table
+                    .filter(
+                        tx::dsl::block_height
+                            .ge(from_block_height)
+                            .and(tx::dsl::block_height.le(to_block_height)),
+                    )
+                    .select(TxDb::as_select())
+                    .get_results(conn)
+                    .with_context(|| {
+                        format!(
+                            "Failed to get transations from the database in \
+                             the range {from_block_height}-{to_block_height}"
+                        )
+                    })
+            })
         })
         .await
         .context_db_interact_error()?
