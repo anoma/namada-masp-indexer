@@ -15,7 +15,6 @@ use crate::tx_index::MaspTxIndex;
 pub struct Transaction {
     pub hash: Id,
     pub masp_txs: Vec<(MaspTxIndex, NamadaMaspTransaction)>,
-    pub fee_unshielding_tx: Option<NamadaMaspTransaction>, // TODO
 }
 
 impl Transaction {
@@ -72,7 +71,6 @@ impl Transaction {
         Some(Transaction {
             masp_txs,
             hash: Id::from(transaction_id),
-            fee_unshielding_tx: None,
         })
     }
 }

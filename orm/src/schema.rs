@@ -27,7 +27,6 @@ diesel::table! {
     notes_index (note_position) {
         note_position -> Int4,
         block_index -> Int4,
-        is_fee_unshielding -> Bool,
         block_height -> Int4,
         masp_tx_index -> Int4,
     }

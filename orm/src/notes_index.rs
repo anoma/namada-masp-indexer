@@ -8,7 +8,6 @@ use crate::schema::notes_index;
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NotesIndexDb {
     pub block_index: i32,
-    pub is_fee_unshielding: bool,
     pub note_position: i32,
     pub block_height: i32,
     pub masp_tx_index: i32,
@@ -19,7 +18,6 @@ pub struct NotesIndexDb {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NotesIndexInsertDb {
     pub block_index: i32,
-    pub is_fee_unshielding: bool,
     pub note_position: i32,
     pub block_height: i32,
     pub masp_tx_index: i32,
