@@ -7,7 +7,6 @@ pub struct NotesIndexResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct Note {
-    pub is_fee_unshielding: bool,
     pub block_height: u64,
     pub block_index: u64,
     pub masp_tx_index: u64,
@@ -15,20 +14,18 @@ pub struct Note {
 }
 
 impl NotesIndexResponse {
-    pub fn new(notes_index: Vec<(bool, u64, u64, u64, u64)>) -> Self {
+    pub fn new(notes_index: Vec<(u64, u64, u64, u64)>) -> Self {
         Self {
             notes_index: notes_index
                 .into_iter()
                 .map(
                     |(
-                        is_fee_unshielding,
                         block_height,
                         block_index,
                         masp_tx_index,
                         note_position,
                     )| {
                         Note {
-                            is_fee_unshielding,
                             block_height,
                             block_index,
                             masp_tx_index,

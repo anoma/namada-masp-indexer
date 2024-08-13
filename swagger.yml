@@ -147,9 +147,6 @@ components:
           items:
             type: object
             properties:
-              is_fee_unshielding:
-                type: boolean
-                description: Whether this is a fee unshielding.
               block_height:
                 type: integer
                 minimum: 0

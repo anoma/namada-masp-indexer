@@ -4,16 +4,11 @@ use orm::notes_index::NotesIndexInsertDb;
 use shared::indexed_tx::IndexedTx;
 
 #[derive(Default, Clone, Debug)]
-pub struct TxNoteMap(BTreeMap<IndexedTx, (bool, usize)>);
+pub struct TxNoteMap(BTreeMap<IndexedTx, usize>);
 
 impl TxNoteMap {
-    pub fn insert(
-        &mut self,
-        indexed_tx: IndexedTx,
-        is_fee_unshielding: bool,
-        note_pos: usize,
-    ) {
-        self.0.insert(indexed_tx, (is_fee_unshielding, note_pos));
+    pub fn insert(&mut self, indexed_tx: IndexedTx, note_pos: usize) {
+        self.0.insert(indexed_tx, note_pos);
     }
 
     pub fn is_empty(&self) -> bool {
@@ -30,9 +25,8 @@ impl TxNoteMap {
                         block_index,
                         masp_tx_index,
                     },
-                    &(is_fee_unshielding, note_pos),
+                    &note_pos,
                 )| NotesIndexInsertDb {
-                    is_fee_unshielding,
                     block_index: block_index.0 as i32,
                     note_position: note_pos as i32,
                     block_height: block_height.0 as i32,
