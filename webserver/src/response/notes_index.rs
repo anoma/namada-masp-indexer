@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct NotesMapResponse {
-    pub notes_map: Vec<Note>,
+pub struct NotesIndexResponse {
+    pub notes_index: Vec<Note>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -14,10 +14,10 @@ pub struct Note {
     pub note_position: u64,
 }
 
-impl NotesMapResponse {
-    pub fn new(notes_map: Vec<(bool, u64, u64, u64, u64)>) -> Self {
+impl NotesIndexResponse {
+    pub fn new(notes_index: Vec<(bool, u64, u64, u64, u64)>) -> Self {
         Self {
-            notes_map: notes_map
+            notes_index: notes_index
                 .into_iter()
                 .map(
                     |(

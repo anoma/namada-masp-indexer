@@ -1,1 +1,1 @@
-DROP TABLE notes_map;
+DROP TABLE notes_index;

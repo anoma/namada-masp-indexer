@@ -4,20 +4,20 @@ use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
 use shared::indexed_tx::IndexedTx;
 
 use crate::entity::commitment_tree::CommitmentTree;
-use crate::entity::tx_note_map::TxNoteMap;
+use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 
 /// Update the merkle tree of witnesses the first time we
 /// scan a new MASP transaction.
 pub fn update_witness_map(
     commitment_tree: &CommitmentTree,
-    tx_note_map: &mut TxNoteMap,
+    tx_notes_index: &mut TxNoteMap,
     witness_map: &WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> anyhow::Result<()> {
     let mut note_pos = commitment_tree.size();
-    tx_note_map
+    tx_notes_index
         .insert(indexed_tx, false /* is_fee_unshielding */, note_pos);
 
     for so in shielded

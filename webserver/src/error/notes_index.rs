@@ -5,18 +5,18 @@ use thiserror::Error;
 use crate::response::api::ApiErrorResponse;
 
 #[derive(Error, Debug)]
-pub enum NotesMapError {
-    #[error("NotesMap not found")]
+pub enum NotesIndexError {
+    #[error("NotesIndex not found")]
     NotFound,
     #[error("Database error: {0}")]
     Database(String),
 }
 
-impl IntoResponse for NotesMapError {
+impl IntoResponse for NotesIndexError {
     fn into_response(self) -> Response {
         let status_code = match self {
-            NotesMapError::NotFound => StatusCode::NOT_FOUND,
-            NotesMapError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            NotesIndexError::NotFound => StatusCode::NOT_FOUND,
+            NotesIndexError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         ApiErrorResponse::send(status_code.as_u16(), Some(self.to_string()))

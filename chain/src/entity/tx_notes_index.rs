@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use orm::notes_map::NotesMapInsertDb;
+use orm::notes_index::NotesIndexInsertDb;
 use shared::indexed_tx::IndexedTx;
 
 #[derive(Default, Clone, Debug)]
@@ -20,7 +20,7 @@ impl TxNoteMap {
         self.0.is_empty()
     }
 
-    pub fn into_db(&self) -> Vec<NotesMapInsertDb> {
+    pub fn into_db(&self) -> Vec<NotesIndexInsertDb> {
         self.0
             .iter()
             .map(
@@ -31,7 +31,7 @@ impl TxNoteMap {
                         masp_tx_index,
                     },
                     &(is_fee_unshielding, note_pos),
-                )| NotesMapInsertDb {
+                )| NotesIndexInsertDb {
                     is_fee_unshielding,
                     block_index: block_index.0 as i32,
                     note_position: note_pos as i32,

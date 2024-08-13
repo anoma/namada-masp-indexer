@@ -48,7 +48,10 @@ impl ApplicationServer {
                     "/witness-map",
                     get(handler::witness_map::get_witness_map),
                 )
-                .route("/notes-map", get(handler::notes_map::get_notes_map))
+                .route(
+                    "/notes-index",
+                    get(handler::notes_index::get_notes_index),
+                )
                 .route("/tx", get(handler::tx::get_tx))
                 .route("/height", get(handler::namada_state::get_latest_height))
                 .route(

@@ -24,7 +24,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    notes_map (note_position) {
+    notes_index (note_position) {
         note_position -> Int4,
         block_index -> Int4,
         is_fee_unshielding -> Bool,
@@ -56,7 +56,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     block_index,
     chain_state,
     commitment_tree,
-    notes_map,
+    notes_index,
     tx,
     witness,
 );
