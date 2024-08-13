@@ -58,7 +58,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotesMapResponse'
+                $ref: '#/components/schemas/NotesIndexResponse'
   /witness-map:
     get:
       parameters:
@@ -139,10 +139,10 @@ components:
           type: integer
           minimum: 0
           description: The block height of the commitment tree.
-    NotesMapResponse:
+    NotesIndexResponse:
       type: object
       properties:
-        notes_map:
+        notes_index:
           type: array
           items:
             type: object

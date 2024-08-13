@@ -23,7 +23,7 @@ use crate::appstate::AppState;
 use crate::config::AppConfig;
 use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
-use crate::entity::tx_note_map::TxNoteMap;
+use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 use crate::services::masp::update_witness_map;
 use crate::services::{
@@ -207,7 +207,7 @@ async fn build_and_commit_masp_data_at_height(
     };
 
     let mut shielded_txs = BTreeMap::new();
-    let mut tx_note_map = TxNoteMap::default();
+    let mut tx_notes_index = TxNoteMap::default();
 
     tracing::info!(
         %block_height,
@@ -229,7 +229,7 @@ async fn build_and_commit_masp_data_at_height(
 
             update_witness_map(
                 &commitment_tree,
-                &mut tx_note_map,
+                &mut tx_notes_index,
                 &witness_map,
                 indexed_tx,
                 &masp_tx,
@@ -245,7 +245,7 @@ async fn build_and_commit_masp_data_at_height(
         chain_state,
         commitment_tree,
         witness_map,
-        tx_note_map,
+        tx_notes_index,
         shielded_txs,
     )
     .await

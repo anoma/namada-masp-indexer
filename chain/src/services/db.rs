@@ -25,7 +25,7 @@ use shared::indexed_tx::IndexedTx;
 
 use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
-use crate::entity::tx_note_map::TxNoteMap;
+use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../orm/migrations/");
@@ -179,7 +179,7 @@ pub async fn commit(
     chain_state: ChainState,
     commitment_tree: CommitmentTree,
     witness_map: WitnessMap,
-    notes_map: TxNoteMap,
+    notes_index: TxNoteMap,
     shielded_txs: BTreeMap<IndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     tracing::info!(
@@ -231,15 +231,15 @@ pub async fn commit(
                     );
                 }
 
-                if !notes_map.is_empty() {
+                if !notes_index.is_empty() {
                     tracing::debug!(
                         block_height = %chain_state.block_height,
                         "Pre-committing notes map"
                     );
 
-                    let notes_map_db = notes_map.into_db();
-                    diesel::insert_into(schema::notes_map::table)
-                        .values(&notes_map_db)
+                    let notes_index_db = notes_index.into_db();
+                    diesel::insert_into(schema::notes_index::table)
+                        .values(&notes_index_db)
                         .on_conflict_do_nothing()
                         .execute(transaction_conn)
                         .context("Failed to insert notes map into db")?;

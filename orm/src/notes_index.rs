@@ -1,12 +1,12 @@
 use diesel::{Insertable, Queryable, Selectable};
 use serde::Serialize;
 
-use crate::schema::notes_map;
+use crate::schema::notes_index;
 
 #[derive(Serialize, Queryable, Selectable, Clone)]
-#[diesel(table_name = notes_map)]
+#[diesel(table_name = notes_index)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NotesMapDb {
+pub struct NotesIndexDb {
     pub block_index: i32,
     pub is_fee_unshielding: bool,
     pub note_position: i32,
@@ -15,9 +15,9 @@ pub struct NotesMapDb {
 }
 
 #[derive(Serialize, Insertable, Clone)]
-#[diesel(table_name = notes_map)]
+#[diesel(table_name = notes_index)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NotesMapInsertDb {
+pub struct NotesIndexInsertDb {
     pub block_index: i32,
     pub is_fee_unshielding: bool,
     pub note_position: i32,

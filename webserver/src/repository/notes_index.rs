@@ -1,42 +1,42 @@
 use anyhow::Context;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
-use orm::notes_map::NotesMapDb;
-use orm::schema::notes_map;
+use orm::notes_index::NotesIndexDb;
+use orm::schema::notes_index;
 use shared::error::ContextDbInteractError;
 
 use crate::appstate::AppState;
 
 #[derive(Clone)]
-pub struct NotesMapRepository {
+pub struct NotesIndexRepository {
     pub(crate) app_state: AppState,
 }
 
-pub trait NotesMapRepositoryTrait {
+pub trait NotesIndexRepositoryTrait {
     fn new(app_state: AppState) -> Self;
-    async fn get_notes_map(
+    async fn get_notes_index(
         &self,
         block_height: i32,
-    ) -> anyhow::Result<Vec<NotesMapDb>>;
+    ) -> anyhow::Result<Vec<NotesIndexDb>>;
 }
 
-impl NotesMapRepositoryTrait for NotesMapRepository {
+impl NotesIndexRepositoryTrait for NotesIndexRepository {
     fn new(app_state: AppState) -> Self {
         Self { app_state }
     }
 
-    async fn get_notes_map(
+    async fn get_notes_index(
         &self,
         block_height: i32,
-    ) -> anyhow::Result<Vec<NotesMapDb>> {
+    ) -> anyhow::Result<Vec<NotesIndexDb>> {
         let conn = self.app_state.get_db_connection().await.context(
             "Failed to retrieve connection from the pool of database \
              connections",
         )?;
 
         conn.interact(move |conn| {
-            notes_map::table
-                .filter(notes_map::dsl::block_height.le(block_height))
-                .select(NotesMapDb::as_select())
+            notes_index::table
+                .filter(notes_index::dsl::block_height.le(block_height))
+                .select(NotesIndexDb::as_select())
                 .get_results(conn)
                 .with_context(|| {
                     format!(
