@@ -43,7 +43,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LatestHeightResponse'
-  /notes-map:
+  /notes-index:
     get:
       parameters:
         - in: query
