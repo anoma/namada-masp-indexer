@@ -27,22 +27,21 @@ impl Block {
             transactions: Vec::with_capacity(raw_block.block.data.len()),
         };
 
-        for (block_index, masp_tx_sechashes) in indexed_masp_txs.locations {
+        for (block_index, masp_tx_refs) in indexed_masp_txs.locations {
             let tx_bytes = &raw_block.block.data[block_index];
 
-            let tx =
-                match Transaction::from_namada_tx(tx_bytes, &masp_tx_sechashes)
-                {
-                    Some(tx) => tx,
-                    None => {
-                        tracing::warn!(
-                            block_hash = %block.hash,
-                            block_index,
-                            "Invalid Namada transaction in block"
-                        );
-                        continue;
-                    }
-                };
+            let tx = match Transaction::from_namada_tx(tx_bytes, &masp_tx_refs)
+            {
+                Some(tx) => tx,
+                None => {
+                    tracing::warn!(
+                        block_hash = %block.hash,
+                        block_index,
+                        "Invalid Namada transaction in block"
+                    );
+                    continue;
+                }
+            };
 
             block.transactions.push((block_index, tx));
         }
