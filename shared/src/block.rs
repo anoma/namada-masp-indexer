@@ -30,18 +30,18 @@ impl Block {
         for (block_index, masp_tx_refs) in indexed_masp_txs.locations {
             let tx_bytes = &raw_block.block.data[block_index];
 
-            let tx = match Transaction::from_namada_tx(tx_bytes, &masp_tx_refs)
-            {
-                Some(tx) => tx,
-                None => {
-                    tracing::warn!(
-                        block_hash = %block.hash,
-                        block_index,
-                        "Invalid Namada transaction in block"
-                    );
-                    continue;
-                }
-            };
+            let tx =
+                match Transaction::from_namada_tx(tx_bytes, &masp_tx_refs.0) {
+                    Some(tx) => tx,
+                    None => {
+                        tracing::warn!(
+                            block_hash = %block.hash,
+                            block_index,
+                            "Invalid Namada transaction in block"
+                        );
+                        continue;
+                    }
+                };
 
             block.transactions.push((block_index, tx));
         }
