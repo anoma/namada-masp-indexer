@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 env:
-  nightly: nightly-2024-05-15
+  nightly: nightly-2024-09-08
 
 jobs:
   validate-swagger:
