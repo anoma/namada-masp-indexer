@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use namada_core::storage::BlockHeight as NamadaBlockHeight;
+use namada_core::chain::BlockHeight as NamadaBlockHeight;
 use tendermint::block::Height;
 
 pub struct FollowingHeights(BlockHeight);

@@ -4,7 +4,7 @@ use std::fmt::Display;
 use namada_core::borsh::BorshDeserialize;
 use namada_core::collections::HashMap;
 use namada_core::hash::Hash;
-use namada_core::masp::TxId;
+use namada_core::masp::MaspTxId;
 use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
 use namada_sdk::token::Transfer;
 use namada_tx::{Data, Section, Tx as NamadaTx, TxCommitments};
@@ -70,7 +70,7 @@ impl Transaction {
                 };
 
                 let masp_tx_index =
-                    all_masp_txs.get(&TxId::from(masp_tx.txid())).cloned().or_else(|| {
+                    all_masp_txs.get(&MaspTxId::from(masp_tx.txid())).cloned().or_else(|| {
                         tracing::warn!(
                             %transaction_id,
                             ?masp_tx,
@@ -99,7 +99,7 @@ impl Display for Transaction {
 fn get_shielded_tx_id(
     transaction: &NamadaTx,
     cmt: &TxCommitments,
-) -> Option<TxId> {
+) -> Option<MaspTxId> {
     let tx_data = get_namada_tx_data(transaction, &cmt.data_hash)?;
 
     Transfer::try_from_slice(tx_data)
@@ -107,7 +107,7 @@ fn get_shielded_tx_id(
         .and_then(|tx| tx.shielded_section_hash)
         .or_else(|| {
             get_masp_tx_from_ibc_data(transaction, &cmt.data_hash)
-                .map(|tx| TxId::from(tx.txid()))
+                .map(|tx| MaspTxId::from(tx.txid()))
         })
 }
 
