@@ -19,7 +19,7 @@ impl Block {
     pub fn new(
         raw_block: block::Response,
         raw_results: block_results::Response,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let indexed_masp_txs = locate_masp_txs(&raw_results);
 
         let mut block = Block {
@@ -35,23 +35,12 @@ impl Block {
         {
             let block_index = tx_index.0 as usize;
             let tx_bytes = &raw_block.block.data[block_index];
-
-            let tx = match Transaction::from_namada_tx(tx_bytes, &masp_refs.0) {
-                Some(tx) => tx,
-                None => {
-                    tracing::warn!(
-                        block_hash = %block.hash,
-                        block_index,
-                        "Invalid Namada transaction in block"
-                    );
-                    continue;
-                }
-            };
+            let tx = Transaction::from_namada_tx(tx_bytes, &masp_refs.0)?;
 
             block.transactions.push((block_index, tx));
         }
 
-        block
+        Ok(block)
     }
 }
 

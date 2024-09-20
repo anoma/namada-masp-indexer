@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use shared::block::Block;
 use shared::height::BlockHeight;
 use tendermint_rpc::endpoint::{block, block_results};
@@ -13,7 +13,7 @@ pub async fn query_masp_txs_in_block(
         query_raw_block_results_at_height(client, height),
     )?;
 
-    Ok(Block::new(raw_block, raw_block_results))
+    Block::new(raw_block, raw_block_results).map_err(|err| anyhow!(err))
 }
 
 async fn query_raw_block(
