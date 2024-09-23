@@ -15,7 +15,21 @@ services:
       timeout: 10s
       retries: 5
       start_period: 80s
-  
+
+  block-index:
+    image: namada-masp-block-index
+    build:
+      context: .
+      dockerfile: block-index/Dockerfile
+    environment:
+      COMETBFT_URL: ${COMETBFT_URL}
+      DATABASE_URL: postgres://postgres:password@postgres:5432/masp_indexer_local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   webserver:
     image: namada-masp-webserver
     build:
@@ -34,8 +48,7 @@ services:
       context: .
       dockerfile: chain/Dockerfile
     environment:
-      COMETBFT_URL: <>
-      CHAIN_ID: <>
+      COMETBFT_URL: ${COMETBFT_URL}
       DATABASE_URL: postgres://postgres:password@postgres:5432/masp_indexer_local
     depends_on:
       postgres:
