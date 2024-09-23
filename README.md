@@ -13,6 +13,11 @@ quickly, alleviating remote procedure calls to full nodes.
 
 ⚠️ This project is still a work-in-progress, use at your own risk! ⚠️
 
+## How to run
+
+- Copy the `.env.template` to `.env` file and edit the necessary variables.
+- Run `docker compose up`
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0. You can
