@@ -13,7 +13,7 @@ use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
 use shared::transaction::Transaction;
-use shared::tx_index::TxIndex;
+use shared::tx_index::{MaspTxIndex, TxIndex};
 use tendermint_rpc::HttpClient;
 use tokio::signal;
 use tokio_retry::strategy::{jitter, FixedInterval};
@@ -218,13 +218,11 @@ async fn build_and_commit_masp_data_at_height(
     for (idx, Transaction { masp_txs, .. }) in
         block_data.transactions.into_iter()
     {
-        for (masp_tx_index, masp_tx) in masp_txs {
-            // TODO: handle fee unshielding
-
+        for (masp_tx_index, masp_tx) in masp_txs.into_iter().enumerate() {
             let indexed_tx = IndexedTx {
                 block_height,
                 block_index: TxIndex(idx as u32),
-                masp_tx_index,
+                masp_tx_index: MaspTxIndex(masp_tx_index),
             };
 
             update_witness_map(
