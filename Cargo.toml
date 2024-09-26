@@ -24,9 +24,9 @@ diesel_migrations = { version = "2.2.0", default-features = false, features = [ 
 futures = "0.3.30"
 itertools = "0.13.0"
 lazy_static = "1.4.0"
-namada_core = { git = "https://github.com/anoma/namada", rev = "6c813dfc3cd3ba3757ee29923a78caa2124704e9" }
-namada_sdk = { git = "https://github.com/anoma/namada", rev = "6c813dfc3cd3ba3757ee29923a78caa2124704e9" }
-namada_tx = { git = "https://github.com/anoma/namada", rev = "6c813dfc3cd3ba3757ee29923a78caa2124704e9" }
+namada_core = { git = "https://github.com/anoma/namada", rev = "297ee2638dcebe3566286a504249bc66ad8a5e94" }
+namada_sdk = { git = "https://github.com/anoma/namada", rev = "297ee2638dcebe3566286a504249bc66ad8a5e94" }
+namada_tx = { git = "https://github.com/anoma/namada", rev = "297ee2638dcebe3566286a504249bc66ad8a5e94" }
 orm = { path = "orm" }
 serde = { version = "1.0.138", features = [ "derive" ] }
 serde_json = "1.0"
