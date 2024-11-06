@@ -34,7 +34,7 @@ impl ApplicationServer {
         let rps = config.rps.unwrap_or_else(|| *REQ_PER_SEC);
         let db_url = config.database_url.clone();
 
-        let app_state = AppState::new(db_url)?;
+        let app_state = AppState::new(db_url).await?;
 
         let routes = {
             let common_state = CommonState::new(app_state.clone());

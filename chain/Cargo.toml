@@ -30,6 +30,7 @@ tokio-retry.workspace = true
 tokio.workspace = true 
 tracing-subscriber.workspace = true
 tracing.workspace = true
+tryhard.workspace = true
 
 [build-dependencies]
 vergen = { version = "8.0.0", features = ["build", "git", "gitcl"] }

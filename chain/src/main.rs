@@ -45,7 +45,7 @@ async fn main() -> Result<(), MainError> {
     tracing::info!(version = VERSION_STRING, "Started the namada-masp-indexer");
     let exit_handle = must_exit_handle();
 
-    let app_state = AppState::new(database_url).into_db_error()?;
+    let app_state = AppState::new(database_url).await.into_db_error()?;
 
     run_migrations(&app_state).await?;
 
