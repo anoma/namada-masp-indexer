@@ -16,6 +16,11 @@ impl AppState {
             .parse::<usize>()
             .unwrap_or(8_usize);
 
+        let max_conn_retries = env::var("DATABASE_MAX_CONN_RETRIES")
+            .unwrap_or_else(|_| 5.to_string())
+            .parse::<u32>()
+            .unwrap_or(5);
+
         let pool = tryhard::retry_fn(|| async {
             let pool_manager = deadpool_diesel::Manager::from_config(
                 db_url.clone(),
@@ -30,7 +35,7 @@ impl AppState {
                 .build()
                 .context("Failed to build Postgres db pool")
         })
-        .retries(5)
+        .retries(max_conn_retries)
         .exponential_backoff(Duration::from_millis(100))
         .max_delay(Duration::from_secs(5))
         .await?;
