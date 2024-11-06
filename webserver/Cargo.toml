@@ -41,6 +41,7 @@ tracing-subscriber.workspace = true
 tracing.workspace = true
 validator.workspace = true
 xorf.workspace = true
+tryhard.workspace = true
 
 [build-dependencies]
 vergen = { version = "8.0.0", features = ["build", "git", "gitcl"] }

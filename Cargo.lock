@@ -608,6 +608,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "tryhard",
  "vergen",
  "xorf",
 ]
@@ -855,6 +856,7 @@ dependencies = [
  "tokio-retry",
  "tracing",
  "tracing-subscriber",
+ "tryhard",
  "vergen",
 ]
 
@@ -6720,6 +6722,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
+name = "tryhard"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c9f0a709784e86923586cff0d872dba54cd2d2e116b3bc57587d15737cfce9d"
+dependencies = [
+ "futures",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "tungstenite"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7131,6 +7144,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "tryhard",
  "validator",
  "vergen",
  "xorf",

@@ -46,7 +46,7 @@ async fn main() -> Result<(), MainError> {
     tracing::info!(version = VERSION_STRING, "Started the block index builder");
     let mut exit_handle = must_exit();
 
-    let app_state = AppState::new(database_url).into_db_error()?;
+    let app_state = AppState::new(database_url).await.into_db_error()?;
 
     if wait_for_migrations(&mut exit_handle, &app_state)
         .await
