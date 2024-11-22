@@ -4,8 +4,10 @@ pub mod entity;
 pub mod services;
 
 use std::collections::BTreeMap;
+use std::env;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
@@ -16,6 +18,7 @@ use shared::transaction::Transaction;
 use shared::tx_index::{MaspTxIndex, TxIndex};
 use tendermint_rpc::HttpClient;
 use tokio::signal;
+use tokio::time::sleep;
 use tokio_retry::strategy::{jitter, FixedInterval};
 use tokio_retry::RetryIf;
 
@@ -106,12 +109,38 @@ fn must_exit_handle() -> Arc<AtomicBool> {
 }
 
 async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
-    db_service::run_migrations(
-        app_state.get_db_connection().await.into_db_error()?,
-    )
-    .await
-    .context("Failed to run db migrations")
-    .into_db_error()
+    let mut max_retries = env::var("DATABASE_MAX_MIGRATION_RETRY")
+        .unwrap_or_else(|_| 5.to_string())
+        .parse::<u64>()
+        .unwrap_or(5_u64);
+    loop {
+        let migration_res = db_service::run_migrations(
+            app_state.get_db_connection().await.into_db_error()?,
+        )
+        .await;
+
+        match &migration_res {
+            Ok(_) => {
+                return migration_res
+                    .context("Failed to run db migrations")
+                    .into_db_error();
+            }
+            Err(e) => {
+                tracing::debug!(
+                    "Failed runnign migrations: {} ({}/5)",
+                    e.to_string(),
+                    max_retries
+                );
+                if max_retries == 0 {
+                    return migration_res
+                        .context("Failed to run db migrations")
+                        .into_db_error();
+                }
+                max_retries -= 1;
+                sleep(Duration::from_secs(3)).await;
+            }
+        }
+    }
 }
 
 async fn load_committed_state(

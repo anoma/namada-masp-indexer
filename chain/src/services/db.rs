@@ -36,7 +36,9 @@ pub async fn run_migrations(conn: Object) -> anyhow::Result<()> {
     conn.interact(|transaction_conn| {
         transaction_conn
             .run_pending_migrations(MIGRATIONS)
-            .map_err(|_| anyhow!("Failed to run db migrations"))?;
+            .map_err(|e| {
+                anyhow!("Failed to run db migrations: {}", e.to_string())
+            })?;
         anyhow::Ok(())
     })
     .await
