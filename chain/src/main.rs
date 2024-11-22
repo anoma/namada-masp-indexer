@@ -123,7 +123,7 @@ async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
             Ok(_) => {
                 return migration_res
                     .context("Failed to run db migrations")
-                    .into_db_error()
+                    .into_db_error();
             }
             Err(e) => {
                 tracing::debug!(
