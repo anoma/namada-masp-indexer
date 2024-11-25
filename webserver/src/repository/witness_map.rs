@@ -1,5 +1,8 @@
 use anyhow::Context;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
+use diesel::{
+    ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
+    SelectableHelper,
+};
 use orm::schema::witness;
 use orm::witness::WitnessDb;
 use shared::error::ContextDbInteractError;
@@ -35,17 +38,21 @@ impl WitnessMapRepositoryTrait for WitnessMapRepository {
         )?;
 
         conn.interact(move |conn| {
-            let closest_height = witness::table
+            let Some(closest_height) = witness::table
                 .order(abs(witness::dsl::block_height - block_height).asc())
                 .filter(witness::dsl::block_height.le(block_height))
                 .select(witness::dsl::block_height)
                 .first(conn)
+                .optional()
                 .with_context(|| {
                     format!(
                         "Failed to fetch height from the db closest to the \
                          provided height {block_height}"
                     )
-                })?;
+                })?
+            else {
+                return anyhow::Ok((vec![], block_height));
+            };
 
             let witnesses = witness::table
                 .filter(witness::dsl::block_height.eq(closest_height))

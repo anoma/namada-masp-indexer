@@ -24,12 +24,11 @@ pub async fn get_witness_map(
             WitnessMapError::Database(err.to_string())
         })?;
 
-    if let Some((witnesses, block_height)) = witnesses_and_height {
-        Ok(Json(WitnessMapResponse::new(
-            BlockHeight(block_height),
-            witnesses,
-        )))
-    } else {
-        Err(WitnessMapError::NotFound)
-    }
+    let (witnesses, block_height) =
+        witnesses_and_height.unwrap_or((Vec::new(), query_params.height));
+
+    Ok(Json(WitnessMapResponse::new(
+        BlockHeight(block_height),
+        witnesses,
+    )))
 }
