@@ -2,6 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use axum_macros::debug_handler;
 use axum_trace_id::TraceId;
+use shared::commitment_tree::empty as empty_tree;
 use shared::error::InspectWrap;
 
 use crate::dto::tree::TreeQueryParams;
@@ -23,12 +24,11 @@ pub async fn get_commitment_tree(
             TreeError::Database(err.to_string())
         })?;
 
-    if let Some((commitment_tree, block_height)) = maybe_commitment_tree {
-        Ok(Json(TreeResponse {
-            commitment_tree,
-            block_height,
-        }))
-    } else {
-        Err(TreeError::NotFound)
-    }
+    let (commitment_tree, block_height) = maybe_commitment_tree
+        .unwrap_or_else(|| (empty_tree(), query_params.height));
+
+    Ok(Json(TreeResponse {
+        commitment_tree,
+        block_height,
+    }))
 }

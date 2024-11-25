@@ -1,5 +1,6 @@
 pub mod block;
 pub mod block_results;
+pub mod commitment_tree;
 pub mod error;
 pub mod extracted_masp_tx;
 pub mod header;

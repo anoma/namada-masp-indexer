@@ -6,8 +6,6 @@ use crate::response::api::ApiErrorResponse;
 
 #[derive(Error, Debug)]
 pub enum TreeError {
-    #[error("Commitment Tree not found")]
-    NotFound,
     #[error("Database error: {0}")]
     Database(String),
 }
@@ -15,7 +13,6 @@ pub enum TreeError {
 impl IntoResponse for TreeError {
     fn into_response(self) -> Response {
         let status_code = match self {
-            TreeError::NotFound => StatusCode::NOT_FOUND,
             TreeError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 

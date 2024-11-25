@@ -6,8 +6,6 @@ use crate::response::api::ApiErrorResponse;
 
 #[derive(Error, Debug)]
 pub enum WitnessMapError {
-    #[error("WitnessMap not found")]
-    NotFound,
     #[error("Database error: {0}")]
     Database(String),
 }
@@ -15,7 +13,6 @@ pub enum WitnessMapError {
 impl IntoResponse for WitnessMapError {
     fn into_response(self) -> Response {
         let status_code = match self {
-            WitnessMapError::NotFound => StatusCode::NOT_FOUND,
             WitnessMapError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
