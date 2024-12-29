@@ -40,12 +40,10 @@ Before starting, ensure you have the necessary tools and dependencies installed.
 - **Packages**: Install prerequisite packages from the APT repository.
 
 ```sh
-apt-get install -y curl apt-transport-https ca-certificates software-properties-common git nano just build-essential
+apt-get install -y curl apt-transport-https ca-certificates software-properties-common git nano build-essential
 ```
 
 - **Docker**: Follow the official instructions provided by Docker to install it: [Install Docker Engine](https://docs.docker.com/engine/install/).
-
-- **Just**: Refer to the official documentation to install `just`: [Just Installation Guide](https://github.com/casey/just).
 
 ### Usage
 Ensure you have the latest repository cloned to maintain compatibility with other Namada interfaces. Use the following commands to clone the repository and navigate into its directory.
