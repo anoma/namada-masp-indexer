@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   block-index:
-    image: namada-masp-block-index
+    image: namada-masp-indexer/block-index
     build:
       context: .
       dockerfile: block-index/Dockerfile
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   webserver:
-    image: namada-masp-webserver
+    image: namada-masp-indexer/webserver
     build:
       context: .
       dockerfile: webserver/Dockerfile
@@ -51,6 +51,7 @@ services:
     restart: unless-stopped
 
   crawler:
+    image: namada-masp-indexer/crawler
     build:
       context: .
       dockerfile: chain/Dockerfile
