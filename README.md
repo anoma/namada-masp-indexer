@@ -31,7 +31,7 @@ The Namada MASP Indexer consists of a set of containers, for indexing MASP data 
 - `namada-masp-webserver`
 - `postgres:16-alpine`
 
-## 🐳 Installation with Docker 
+## 🐳 Docker Deployment
 
 ### Prerequisites
 
