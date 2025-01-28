@@ -34,12 +34,14 @@ use crate::services::{
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
+const DEFAULT_INTERVAL: u64 = 5;
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     let AppConfig {
         cometbft_url,
         database_url,
+        interval,
         verbosity,
     } = AppConfig::parse();
 
@@ -56,7 +58,11 @@ async fn main() -> Result<(), MainError> {
         load_committed_state(&app_state).await?;
 
     let client = Arc::new(HttpClient::new(cometbft_url.as_ref()).unwrap());
-    let retry_strategy = FixedInterval::from_millis(5000).map(jitter);
+
+    let internal = interval
+        .map(|millis| millis * 1000)
+        .unwrap_or(DEFAULT_INTERVAL * 1000);
+    let retry_strategy = FixedInterval::from_millis(internal).map(jitter);
 
     for block_height in FollowingHeights::after(last_block_height) {
         if must_exit(&exit_handle) {

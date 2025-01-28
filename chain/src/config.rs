@@ -10,6 +10,9 @@ pub struct AppConfig {
     #[clap(long, env)]
     pub database_url: String,
 
+    #[clap(long, env)]
+    pub interval: Option<u64>,
+
     #[command(flatten)]
     pub verbosity: Verbosity<InfoLevel>,
 }
