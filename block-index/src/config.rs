@@ -34,6 +34,7 @@ pub fn install_tracing_subscriber(
     if let Some(log_level) = log_level {
         let subscriber = FmtSubscriber::builder()
             .with_max_level(log_level)
+            .with_ansi(false)
             .with_writer(non_blocking_logger)
             .finish();
         tracing::subscriber::set_global_default(subscriber).unwrap();
