@@ -12,12 +12,12 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready", "-d", "masp_indexer_local"]
       interval: 5s
-      timeout: 10s
+      timeout: 5s
       retries: 5
-      start_period: 80s
+    restart: unless-stopped
 
   block-index:
-    image: namada-masp-block-index
+    image: namada-masp-indexer/block-index
     build:
       context: .
       dockerfile: block-index/Dockerfile
@@ -29,9 +29,10 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
   webserver:
-    image: namada-masp-webserver
+    image: namada-masp-indexer/webserver
     build:
       context: .
       dockerfile: webserver/Dockerfile
@@ -42,8 +43,15 @@ services:
       DATABASE_URL: postgres://postgres:password@postgres:5432/masp_indexer_local
     depends_on:
       - crawler
-  
+    healthcheck:
+      test: curl --fail http://localhost:5000/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   crawler:
+    image: namada-masp-indexer/crawler
     build:
       context: .
       dockerfile: chain/Dockerfile
@@ -55,3 +63,4 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
