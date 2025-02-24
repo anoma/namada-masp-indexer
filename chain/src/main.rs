@@ -16,6 +16,7 @@ use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
 use shared::transaction::Transaction;
 use shared::tx_index::{MaspTxIndex, TxIndex};
+use tendermint_rpc::client::CompatMode;
 use tendermint_rpc::HttpClient;
 use tokio::signal;
 use tokio::time::sleep;
@@ -57,7 +58,11 @@ async fn main() -> Result<(), MainError> {
     let (last_block_height, commitment_tree, witness_map) =
         load_committed_state(&app_state).await?;
 
-    let client = Arc::new(HttpClient::new(cometbft_url.as_ref()).unwrap());
+    let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
+        .compat_mode(CompatMode::V0_37)
+        .build()
+        .unwrap();
+    let client = Arc::new(client);
 
     let internal = interval
         .map(|millis| millis * 1000)
