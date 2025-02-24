@@ -44,3 +44,4 @@ tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 validator = { version = "0.16.0", features = ["derive"] }
 xorf = { version = "0.11.0", features = ["serde"]}
 tryhard = { version = "0.5.1" }
+vergen = "8.0.0"
