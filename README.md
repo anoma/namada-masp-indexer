@@ -1,11 +1,5 @@
 # 🟡 Namada MASP Indexer
 
-## Status
-
-- 🔧 - This project is a work in progress. 
-- 🚧 - Functionality is not guaranteed at this stage. 
-- ⚠️ - Use at your own risk.
-
 ##  About 
 
 This repository, **Namada MASP Indexer**, is distinct from and incomparable to the similarly named [Namada Indexer](https://github.com/anoma/namada-indexer).
