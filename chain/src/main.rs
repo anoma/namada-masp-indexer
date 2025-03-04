@@ -13,9 +13,11 @@ use anyhow::Context;
 use clap::Parser;
 use itertools::Itertools;
 use namada_core::masp_primitives::ff::PrimeField;
-use namada_sdk::masp_primitives::merkle_tree::CommitmentTree as MaspCommitmentTree;
 use namada_core::masp_primitives::sapling::Node;
 use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
+use namada_sdk::masp_primitives::merkle_tree::CommitmentTree as MaspCommitmentTree;
+use orm::schema::commitment_tree::dsl::commitment_tree;
+use shared::block::Block;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
@@ -27,8 +29,7 @@ use tokio::signal;
 use tokio::time::sleep;
 use tokio_retry::strategy::{jitter, FixedInterval};
 use tokio_retry::RetryIf;
-use orm::schema::commitment_tree::dsl::commitment_tree;
-use shared::block::Block;
+
 use crate::appstate::AppState;
 use crate::config::AppConfig;
 use crate::entity::chain_state::ChainState;
@@ -303,7 +304,10 @@ async fn transaction_order_search(
     block: Block,
     cmt_tree: &MaspCommitmentTree<Node>,
 ) -> Result<Vec<(IndexedTx, Transaction)>, MainError> {
-    let mut masp_txs = block.transactions.into_iter().flat_map(|(_, tx)| tx.masp_txs)
+    let mut masp_txs = block
+        .transactions
+        .into_iter()
+        .flat_map(|(_, tx)| tx.masp_txs)
         .collect::<Vec<_>>();
     for subset in masp_txs.iter().enumerate().powerset() {
         let mut ctree: MaspCommitmentTree<Node> = cmt_tree.clone();
@@ -323,14 +327,17 @@ async fn transaction_order_search(
             namada_sdk::token::storage_key::masp_commitment_anchor_key(*root);
         if namada_sdk::rpc::query_has_storage_key(client.as_ref(), &anchor_key)
             .await
-            .map_err(|_| MainError)? {
-
-
+            .map_err(|_| MainError)?
+        {
             let (mut first, second) = std::mem::take(&mut masp_txs)
                 .into_iter()
                 .enumerate()
                 .partition::<Vec<_>, _>(|(ix, tx)| fee_transfers.contains(ix));
-            return Ok(first.into_iter().chain(second.into_iter()).map(|(_, tx)| tx).collect())
+            return Ok(first
+                .into_iter()
+                .chain(second.into_iter())
+                .map(|(_, tx)| tx)
+                .collect());
         }
     }
 }
@@ -341,8 +348,8 @@ fn update_tree(
 ) -> Result<(), MainError> {
     for so in stx_batch
         .sapling_bundle()
-        .map_or(&vec![], |x| &x.shielded_outputs) {
-
+        .map_or(&vec![], |x| &x.shielded_outputs)
+    {
         let node = Node::new(so.cmu.to_repr());
         commitment_tree.append(node).map_error(|_| MainError)?;
     }
