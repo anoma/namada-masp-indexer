@@ -3,7 +3,7 @@ pub mod config;
 pub mod entity;
 pub mod services;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
@@ -11,6 +11,11 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
+use itertools::Itertools;
+use namada_core::masp_primitives::ff::PrimeField;
+use namada_sdk::masp_primitives::merkle_tree::CommitmentTree as MaspCommitmentTree;
+use namada_core::masp_primitives::sapling::Node;
+use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
@@ -22,7 +27,8 @@ use tokio::signal;
 use tokio::time::sleep;
 use tokio_retry::strategy::{jitter, FixedInterval};
 use tokio_retry::RetryIf;
-
+use orm::schema::commitment_tree::dsl::commitment_tree;
+use shared::block::Block;
 use crate::appstate::AppState;
 use crate::config::AppConfig;
 use crate::entity::chain_state::ChainState;
@@ -290,4 +296,54 @@ async fn build_and_commit_masp_data_at_height(
     .into_db_error()?;
 
     Ok(())
+}
+
+async fn transaction_order_search(
+    client: Arc<HttpClient>,
+    block: Block,
+    cmt_tree: &MaspCommitmentTree<Node>,
+) -> Result<Vec<(IndexedTx, Transaction)>, MainError> {
+    let mut masp_txs = block.transactions.into_iter().flat_map(|(_, tx)| tx.masp_txs)
+        .collect::<Vec<_>>();
+    for subset in masp_txs.iter().enumerate().powerset() {
+        let mut ctree: MaspCommitmentTree<Node> = cmt_tree.clone();
+        let mut fee_transfers = BTreeSet::new();
+        for (ix, stx_batch) in &subset {
+            fee_transfers.insert(ix);
+            update_tree(stx_batch, &mut ctree)?;
+        }
+        for (ix, stx) in masp_txs.iter().enumerate() {
+            if !fee_transfers.contains(&ix) {
+                update_tree(stx, &mut ctree)?;
+            }
+        }
+
+        let root = ctree.root();
+        let anchor_key =
+            namada_sdk::token::storage_key::masp_commitment_anchor_key(*root);
+        if namada_sdk::rpc::query_has_storage_key(client.as_ref(), &anchor_key)
+            .await
+            .map_err(|_| MainError)? {
+
+
+            let (mut first, second) = std::mem::take(&mut masp_txs)
+                .into_iter()
+                .enumerate()
+                .partition::<Vec<_>, _>(|(ix, tx)| fee_transfers.contains(ix));
+            return Ok(first.into_iter().chain(second.into_iter()).map(|(_, tx)| tx).collect())
+        }
+    }
+}
+
+fn update_tree(
+    stx_batch: &NamadaMaspTransaction,
+    commitment_tree: &mut MaspCommitmentTree<Node>,
+) -> Result<(), MainError> {
+    for so in stx_batch
+        .sapling_bundle()
+        .map_or(&vec![], |x| &x.shielded_outputs) {
+
+        let node = Node::new(so.cmu.to_repr());
+        commitment_tree.append(node).map_error(|_| MainError)?;
+    }
 }
