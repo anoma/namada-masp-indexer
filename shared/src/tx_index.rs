@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use namada_sdk::state::TxIndex as NamadaTxIndex;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -9,6 +11,12 @@ impl From<NamadaTxIndex> for TxIndex {
     }
 }
 
-/// The order in which a masp tx appears in a Namada tx event.
+/// The batch index in which a masp tx appears in a Namada tx event.
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MaspTxIndex(pub usize);
+
+impl Display for MaspTxIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
