@@ -260,8 +260,11 @@ async fn build_and_commit_masp_data_at_height(
         "Processing new masp transactions...",
     );
 
-    for (indexed_tx, Transaction { masp_tx, .. }) in
-        block_data.transactions.into_iter()
+    for Transaction {
+        masp_tx,
+        indexed_tx,
+        ..
+    } in block_data.transactions.into_iter()
     {
         update_witness_map(
             &commitment_tree,
