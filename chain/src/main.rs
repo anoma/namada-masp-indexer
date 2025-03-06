@@ -3,7 +3,7 @@ pub mod config;
 pub mod entity;
 pub mod services;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
@@ -11,7 +11,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use namada_sdk::collections::HashSet;
 use shared::block::Block;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
@@ -291,19 +290,28 @@ async fn lookup_valid_commitment_tree(
     client: &HttpClient,
     commitment_tree: &CommitmentTree,
     block: &Block,
-) -> Result<HashSet<IndexedTx>, MainError> {
+) -> Result<Vec<IndexedTx>, MainError> {
     use itertools::Itertools;
 
-    let mut correct_order = HashSet::new();
+    let all_indexed_txs: Vec<_> = block.indexed_txs().collect();
+
+    let mut correct_order = Vec::with_capacity(all_indexed_txs.len());
+    let mut fee_unshields = HashSet::with_capacity(all_indexed_txs.len());
 
     // Guess the set of fee unshieldings at the current height
-    let fee_unshield_sets = block.indexed_txs().powerset();
+    let fee_unshield_sets = all_indexed_txs.iter().copied().powerset();
 
     for fee_unshield_set in fee_unshield_sets {
         // Start a new attempt at guessing the root of
         // the commitment tree
         commitment_tree.rollback();
         correct_order.clear();
+        fee_unshields.clear();
+
+        tracing::info!(
+            ?fee_unshield_set,
+            "Checking subset of masp fee unshields to build cmt tree"
+        );
 
         for indexed_tx in fee_unshield_set {
             let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
@@ -311,19 +319,21 @@ async fn lookup_valid_commitment_tree(
             masp_service::update_commitment_tree(commitment_tree, masp_tx)
                 .into_masp_error()?;
 
-            correct_order.insert(indexed_tx);
+            correct_order.push(indexed_tx);
+            fee_unshields.insert(indexed_tx);
         }
 
-        for indexed_tx in block.indexed_txs() {
+        for indexed_tx in all_indexed_txs
+            .iter()
+            .copied()
+            .filter(|indexed_tx| fee_unshields.contains(indexed_tx))
+        {
             let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
 
             masp_service::update_commitment_tree(commitment_tree, masp_tx)
                 .into_masp_error()?;
 
-            // NB: since we are using an indexset, the
-            // insertion order is preserved when an item
-            // is already in the set
-            correct_order.insert(indexed_tx);
+            correct_order.push(indexed_tx);
         }
 
         if cometbft_service::query_commitment_tree_anchor_existence(
