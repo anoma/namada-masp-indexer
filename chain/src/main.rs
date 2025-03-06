@@ -3,7 +3,7 @@ pub mod config;
 pub mod entity;
 pub mod services;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::env;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
@@ -11,18 +11,11 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use itertools::Itertools;
-use namada_core::masp_primitives::ff::PrimeField;
-use namada_core::masp_primitives::sapling::Node;
-use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
-use namada_sdk::masp_primitives::merkle_tree::CommitmentTree as MaspCommitmentTree;
-use orm::schema::commitment_tree::dsl::commitment_tree;
+use namada_sdk::collections::HashSet;
 use shared::block::Block;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
-use shared::transaction::Transaction;
-use shared::tx_index::{MaspTxIndex, TxIndex};
 use tendermint_rpc::client::CompatMode;
 use tendermint_rpc::HttpClient;
 use tokio::signal;
@@ -36,9 +29,9 @@ use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::services::masp::update_witness_map;
 use crate::services::{
-    cometbft as cometbft_service, db as db_service, rpc as rpc_service,
+    cometbft as cometbft_service, db as db_service, masp as masp_service,
+    rpc as rpc_service,
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
@@ -262,27 +255,22 @@ async fn build_and_commit_masp_data_at_height(
         "Processing new masp transactions...",
     );
 
-    for (idx, Transaction { masp_txs, .. }) in
-        block_data.transactions.into_iter()
+    for indexed_tx in
+        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
+            .await?
     {
-        for (masp_tx_index, masp_tx) in masp_txs.into_iter().enumerate() {
-            let indexed_tx = IndexedTx {
-                block_height,
-                block_index: TxIndex(idx as u32),
-                masp_tx_index: MaspTxIndex(masp_tx_index),
-            };
+        let masp_tx = block_data.get_masp_tx(indexed_tx).unwrap();
 
-            update_witness_map(
-                &commitment_tree,
-                &mut tx_notes_index,
-                &witness_map,
-                indexed_tx,
-                &masp_tx,
-            )
-            .into_masp_error()?;
+        masp_service::update_witness_map_and_note_index(
+            &commitment_tree,
+            &mut tx_notes_index,
+            &witness_map,
+            indexed_tx,
+            masp_tx,
+        )
+        .into_masp_error()?;
 
-            shielded_txs.insert(indexed_tx, masp_tx);
-        }
+        shielded_txs.insert(indexed_tx, masp_tx.clone());
     }
 
     db_service::commit(
@@ -299,58 +287,58 @@ async fn build_and_commit_masp_data_at_height(
     Ok(())
 }
 
-async fn transaction_order_search(
-    client: Arc<HttpClient>,
-    block: Block,
-    cmt_tree: &MaspCommitmentTree<Node>,
-) -> Result<Vec<(IndexedTx, Transaction)>, MainError> {
-    let mut masp_txs = block
-        .transactions
-        .into_iter()
-        .flat_map(|(_, tx)| tx.masp_txs)
-        .collect::<Vec<_>>();
-    for subset in masp_txs.iter().enumerate().powerset() {
-        let mut ctree: MaspCommitmentTree<Node> = cmt_tree.clone();
-        let mut fee_transfers = BTreeSet::new();
-        for (ix, stx_batch) in &subset {
-            fee_transfers.insert(ix);
-            update_tree(stx_batch, &mut ctree)?;
-        }
-        for (ix, stx) in masp_txs.iter().enumerate() {
-            if !fee_transfers.contains(&ix) {
-                update_tree(stx, &mut ctree)?;
-            }
+async fn lookup_valid_commitment_tree(
+    client: &HttpClient,
+    commitment_tree: &CommitmentTree,
+    block: &Block,
+) -> Result<HashSet<IndexedTx>, MainError> {
+    use itertools::Itertools;
+
+    let mut correct_order = HashSet::new();
+
+    // Guess the set of fee unshieldings at the current height
+    let fee_unshield_sets = block.indexed_txs().powerset();
+
+    for fee_unshield_set in fee_unshield_sets {
+        // Start a new attempt at guessing the root of
+        // the commitment tree
+        commitment_tree.rollback();
+        correct_order.clear();
+
+        for indexed_tx in fee_unshield_set {
+            let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
+
+            masp_service::update_commitment_tree(commitment_tree, masp_tx)
+                .into_masp_error()?;
+
+            correct_order.insert(indexed_tx);
         }
 
-        let root = ctree.root();
-        let anchor_key =
-            namada_sdk::token::storage_key::masp_commitment_anchor_key(*root);
-        if namada_sdk::rpc::query_has_storage_key(client.as_ref(), &anchor_key)
-            .await
-            .map_err(|_| MainError)?
+        for indexed_tx in block.indexed_txs() {
+            let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
+
+            masp_service::update_commitment_tree(commitment_tree, masp_tx)
+                .into_masp_error()?;
+
+            // NB: since we are using an indexset, the
+            // insertion order is preserved when an item
+            // is already in the set
+            correct_order.insert(indexed_tx);
+        }
+
+        if cometbft_service::query_commitment_tree_anchor_existence(
+            client,
+            commitment_tree.root(),
+        )
+        .await
+        .into_masp_error()?
         {
-            let (mut first, second) = std::mem::take(&mut masp_txs)
-                .into_iter()
-                .enumerate()
-                .partition::<Vec<_>, _>(|(ix, tx)| fee_transfers.contains(ix));
-            return Ok(first
-                .into_iter()
-                .chain(second.into_iter())
-                .map(|(_, tx)| tx)
-                .collect());
+            return Ok(correct_order);
         }
     }
-}
 
-fn update_tree(
-    stx_batch: &NamadaMaspTransaction,
-    commitment_tree: &mut MaspCommitmentTree<Node>,
-) -> Result<(), MainError> {
-    for so in stx_batch
-        .sapling_bundle()
-        .map_or(&vec![], |x| &x.shielded_outputs)
-    {
-        let node = Node::new(so.cmu.to_repr());
-        commitment_tree.append(node).map_error(|_| MainError)?;
-    }
+    Err(anyhow::anyhow!(
+        "Couldn't find a valid permutation of fee unshieldings"
+    ))
+    .into_masp_error()
 }
