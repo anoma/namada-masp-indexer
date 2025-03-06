@@ -8,17 +8,19 @@ use namada_tx::event::MaspTxRef;
 use namada_tx::{Data, Section, Tx as NamadaTx};
 
 use crate::id::Id;
+use crate::indexed_tx::IndexedTx;
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
     pub hash: Id,
-    // FIXME: would be better to have a vector with all the inner masp txs here
+    pub indexed_tx: IndexedTx,
     pub masp_tx: NamadaMaspTransaction,
 }
 
 impl Transaction {
     pub fn from_namada_tx(
         transaction: &NamadaTx,
+        indexed_tx: IndexedTx,
         valid_masp_tx_ref: &MaspTxRef,
     ) -> Result<Self, String> {
         let transaction_id = transaction.header_hash();
@@ -42,13 +44,18 @@ impl Transaction {
         Ok(Transaction {
             masp_tx,
             hash: Id::from(transaction_id),
+            indexed_tx,
         })
     }
 }
 
 impl Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.hash)
+        write!(
+            f,
+            "Hash: {}, Batch index: {}",
+            self.hash, self.indexed_tx.masp_tx_index
+        )
     }
 }
 
