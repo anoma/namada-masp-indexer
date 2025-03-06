@@ -942,6 +942,7 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "futures",
+ "itertools 0.13.0",
  "namada_core",
  "namada_sdk",
  "orm",
