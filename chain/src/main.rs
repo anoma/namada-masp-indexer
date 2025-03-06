@@ -326,7 +326,8 @@ async fn lookup_valid_commitment_tree(
         for indexed_tx in all_indexed_txs
             .iter()
             .copied()
-            .filter(|indexed_tx| fee_unshields.contains(indexed_tx))
+            // We filter fee unshields out of this loop
+            .filter(|indexed_tx| !fee_unshields.contains(indexed_tx))
         {
             let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
 
