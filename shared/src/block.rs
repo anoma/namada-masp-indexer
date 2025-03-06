@@ -79,7 +79,7 @@ impl Block {
         transaction.masp_txs.get(indexed_tx.masp_tx_index.0)
     }
 
-    pub fn indexed_txs(&self) -> impl Iterator<Item = IndexedTx> + use<'_> {
+    pub fn indexed_txs(&self) -> impl Iterator<Item = IndexedTx> + '_ {
         self.transactions.iter().flat_map(
             |(block_index, Transaction { masp_txs, .. })| {
                 (0..masp_txs.len()).map(|masp_tx_index| IndexedTx {
