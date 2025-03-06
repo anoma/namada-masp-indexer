@@ -3,8 +3,8 @@ use std::fmt::Display;
 
 use namada_core::hash::Hash;
 use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
-use namada_sdk::events::extend::MaspTxRef;
 use namada_sdk::token::Transfer;
+use namada_tx::event::MaspTxRef;
 use namada_tx::{Data, Section, Tx as NamadaTx};
 
 use crate::id::Id;
@@ -12,50 +12,35 @@ use crate::id::Id;
 #[derive(Debug, Clone)]
 pub struct Transaction {
     pub hash: Id,
-    pub masp_txs: Vec<NamadaMaspTransaction>,
+    // FIXME: would be better to have a vector with all the inner masp txs here
+    pub masp_tx: NamadaMaspTransaction,
 }
 
 impl Transaction {
     pub fn from_namada_tx(
-        nam_tx_bytes: &[u8],
-        valid_masp_tx_refs: &[MaspTxRef],
+        transaction: &NamadaTx,
+        valid_masp_tx_ref: &MaspTxRef,
     ) -> Result<Self, String> {
-        let transaction =
-            NamadaTx::try_from(nam_tx_bytes).map_err(|e| e.to_string())?;
         let transaction_id = transaction.header_hash();
 
-        let masp_txs = valid_masp_tx_refs.iter().try_fold(
-            vec![],
-            |mut acc, masp_tx_ref| {
-                let masp_tx = match &masp_tx_ref {
-                    MaspTxRef::MaspSection(masp_tx_id) => {
-                        let masp_tx = transaction
-                            .get_masp_section(masp_tx_id)
-                            .ok_or_else(|| {
-                                "Missing expected masp section with id: {id}"
-                                    .to_string()
-                            })?;
-                        Cow::Borrowed(masp_tx)
-                    }
-                    MaspTxRef::IbcData(sechash) => {
-                        let masp_tx =
-                            get_masp_tx_from_ibc_data(&transaction, sechash)
-                                .ok_or_else(|| {
-                                    "Missing expected data section with hash: \
-                                     {sechash}"
-                                        .to_string()
-                                })?;
-                        Cow::Owned(masp_tx)
-                    }
-                };
-
-                acc.push(masp_tx.into_owned());
-                Result::<_, String>::Ok(acc)
-            },
-        )?;
+        let masp_tx = match &valid_masp_tx_ref {
+            MaspTxRef::MaspSection(masp_tx_id) => transaction
+                .get_masp_section(masp_tx_id)
+                .ok_or_else(|| {
+                    "Missing expected masp section with id: {id}".to_string()
+                })?
+                .to_owned(),
+            MaspTxRef::IbcData(sechash) => get_masp_tx_from_ibc_data(
+                transaction,
+                sechash,
+            )
+            .ok_or_else(|| {
+                "Missing expected data section with hash: {sechash}".to_string()
+            })?,
+        };
 
         Ok(Transaction {
-            masp_txs,
+            masp_tx,
             hash: Id::from(transaction_id),
         })
     }

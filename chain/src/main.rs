@@ -11,11 +11,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
+use services::masp::update_witness_map;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
-use shared::indexed_tx::IndexedTx;
 use shared::transaction::Transaction;
-use shared::tx_index::{MaspTxIndex, TxIndex};
 use tendermint_rpc::HttpClient;
 use tendermint_rpc::client::CompatMode;
 use tokio::signal;
@@ -29,7 +28,6 @@ use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::services::masp::update_witness_map;
 use crate::services::{
     cometbft as cometbft_service, db as db_service, rpc as rpc_service,
 };
@@ -266,27 +264,19 @@ async fn build_and_commit_masp_data_at_height(
 
     let num_transactions = block_data.transactions.len();
 
-    for (idx, Transaction { masp_txs, .. }) in
+    for (indexed_tx, Transaction { masp_tx, .. }) in
         block_data.transactions.into_iter()
     {
-        for (masp_tx_index, masp_tx) in masp_txs.into_iter().enumerate() {
-            let indexed_tx = IndexedTx {
-                block_height,
-                block_index: TxIndex(idx as u32),
-                masp_tx_index: MaspTxIndex(masp_tx_index),
-            };
+        update_witness_map(
+            &commitment_tree,
+            &mut tx_notes_index,
+            &witness_map,
+            indexed_tx,
+            &masp_tx,
+        )
+        .into_masp_error()?;
 
-            update_witness_map(
-                &commitment_tree,
-                &mut tx_notes_index,
-                &witness_map,
-                indexed_tx,
-                &masp_tx,
-            )
-            .into_masp_error()?;
-
-            shielded_txs.insert(indexed_tx, masp_tx);
-        }
+        shielded_txs.insert(indexed_tx, masp_tx);
     }
 
     let first_checkpoint = Instant::now();
