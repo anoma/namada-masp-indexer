@@ -8,14 +8,13 @@ use tendermint_rpc::endpoint::{block, block_results};
 use crate::block_results::locate_masp_txs;
 use crate::header::BlockHeader;
 use crate::id::Id;
-use crate::indexed_tx::IndexedTx;
 use crate::transaction::Transaction;
 
 #[derive(Debug, Clone, Default)]
 pub struct Block {
     pub hash: Id,
     pub header: BlockHeader,
-    pub transactions: Vec<(IndexedTx, Transaction)>,
+    pub transactions: Vec<Transaction>,
 }
 
 impl Block {
@@ -54,9 +53,9 @@ impl Block {
                 }
             };
 
-            let tx = Transaction::from_namada_tx(tx, &data)?;
+            let tx = Transaction::from_namada_tx(tx, tx_index.into(), &data)?;
 
-            block.transactions.push((tx_index.into(), tx));
+            block.transactions.push(tx);
         }
 
         Ok(block)
@@ -72,10 +71,7 @@ impl Display for Block {
             self.header.height,
             self.transactions
                 .iter()
-                .map(|(indexed_tx, tx)| format!(
-                    "{}: batch index: {}",
-                    tx, indexed_tx.masp_tx_index
-                ))
+                .map(|tx| tx.to_string())
                 .collect::<Vec<String>>()
         )
     }

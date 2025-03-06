@@ -255,17 +255,19 @@ async fn build_and_commit_masp_data_at_height(
 
     let mut shielded_txs = BTreeMap::new();
     let mut tx_notes_index = TxNoteMap::default();
+    let num_transactions = block_data.transactions.len();
 
     tracing::info!(
         %block_height,
-        num_transactions = block_data.transactions.len(),
+        num_transactions,
         "Processing new masp transactions...",
     );
 
-    let num_transactions = block_data.transactions.len();
-
-    for (indexed_tx, Transaction { masp_tx, .. }) in
-        block_data.transactions.into_iter()
+    for Transaction {
+        masp_tx,
+        indexed_tx,
+        ..
+    } in block_data.transactions.into_iter()
     {
         update_witness_map(
             &commitment_tree,
