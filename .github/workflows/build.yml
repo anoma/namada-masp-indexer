@@ -117,7 +117,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/anoma/namada-indexer
+          images: ${{ env.REGISTRY_URL }}/anoma/namada-masp-indexer
           flavor: |
             latest=auto
             prefix=${{ matrix.docker.image }}
