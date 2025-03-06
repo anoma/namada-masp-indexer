@@ -508,9 +508,9 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64ct"
-version = "1.6.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
+checksum = "bb97d56060ee67d285efb8001fec9d2a4c710c32efd2e14b5cbb5ba71930fc2d"
 
 [[package]]
 name = "bech32"
@@ -991,9 +991,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.31"
+version = "4.5.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "027bb0d98429ae334a8698531da7077bdf906419543a35a55c2cb1b66437d767"
+checksum = "6088f3ae8c3608d19260cd7445411865a485688711b78b5be70d78cd96136f83"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1011,9 +1011,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.31"
+version = "4.5.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5589e0cba072e0f3d23791efac0fd8627b49c829c196a492e88168e6a669d863"
+checksum = "22a7ef7f676155edfb82daa97f99441f3ebf4a58d5e32f295a56259f1b6facc8"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1023,9 +1023,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.28"
+version = "4.5.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf4ced95c6f4a675af3da73304b9ac4ed991640c36374e4b46795c49e17cf1ed"
+checksum = "09176aae279615badda0765c0c0b3f6ed53f4709118af73cf4655d85d1530cd7"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -2614,7 +2614,7 @@ dependencies = [
  "fnv",
  "futures-core",
  "futures-sink",
- "http 1.2.0",
+ "http 1.3.0",
  "indexmap",
  "slab",
  "tokio",
@@ -2733,9 +2733,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f16ca2af56261c99fba8bac40a10251ce8188205a4c448fbb745a2e4daa76fea"
+checksum = "0a761d192fbf18bdef69f5ceedd0d1333afcbda0ee23840373b8317570d23c65"
 dependencies = [
  "bytes",
  "fnv",
@@ -2760,18 +2760,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1efedce1fb8e6913f23e0c92de8e62cd5b772a67e7b3946df930a62566c93184"
 dependencies = [
  "bytes",
- "http 1.2.0",
+ "http 1.3.0",
 ]
 
 [[package]]
 name = "http-body-util"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793429d76616a256bcb62c2a2ec2bed781c8307e797e2598c50010f2bee2544f"
+checksum = "b021d93e26becf5dc7e1b75b1bed1fd93124b374ceb73f43d4d4eafec896a64a"
 dependencies = [
  "bytes",
- "futures-util",
- "http 1.2.0",
+ "futures-core",
+ "http 1.3.0",
  "http-body 1.0.1",
  "pin-project-lite",
 ]
@@ -2828,7 +2828,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "h2 0.4.8",
- "http 1.2.0",
+ "http 1.3.0",
  "http-body 1.0.1",
  "httparse",
  "itoa",
@@ -2859,7 +2859,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d191583f3da1305256f22463b9bb0471acad48a4e534a5218b9963e9c1f59b2"
 dependencies = [
  "futures-util",
- "http 1.2.0",
+ "http 1.3.0",
  "hyper 1.6.0",
  "hyper-util",
  "rustls 0.23.23",
@@ -2894,7 +2894,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
- "http 1.2.0",
+ "http 1.3.0",
  "http-body 1.0.1",
  "hyper 1.6.0",
  "pin-project-lite",
@@ -2962,7 +2962,7 @@ dependencies = [
  "borsh",
  "derive_more 1.0.0",
  "displaydoc",
- "http 1.2.0",
+ "http 1.3.0",
  "ibc-app-transfer-types",
  "ibc-core",
  "ibc-proto",
@@ -3753,9 +3753,9 @@ checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
 
 [[package]]
 name = "indexmap"
-version = "2.7.1"
+version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
+checksum = "3954d50fe15b02142bf25d3b8bdadb634ec3948f103d04ffe3031bc8fe9d7058"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.2",
@@ -3991,9 +3991,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.170"
+version = "0.2.171"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "875b3680cb2f8f71bdcf9a30f38d48282f5d3c95cbf9b3fa57269bb5d5c06828"
+checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
 
 [[package]]
 name = "libm"
@@ -4200,12 +4200,11 @@ dependencies = [
 
 [[package]]
 name = "minreq"
-version = "2.13.2"
+version = "2.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da0c420feb01b9fb5061f8c8f452534361dd783756dcf38ec45191ce55e7a161"
+checksum = "567496f13503d6cae8c9f961f34536850275f396307d7a6b981eef1464032f53"
 dependencies = [
  "log",
- "once_cell",
  "rustls 0.21.12",
  "rustls-webpki 0.101.7",
  "webpki-roots",
@@ -4336,9 +4335,8 @@ dependencies = [
 
 [[package]]
 name = "namada_account"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df13eb11542131b4b821da19e1a30e816fa9b43d2997ff35337f464bfe4967c7"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "namada_core",
@@ -4349,9 +4347,8 @@ dependencies = [
 
 [[package]]
 name = "namada_controller"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e346c20510aee8c66a437cd47b0dcbf2207e0d88d3b08239c62ad8002b5dc422"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "namada_core",
  "smooth-operator",
@@ -4360,9 +4357,8 @@ dependencies = [
 
 [[package]]
 name = "namada_core"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "305f82e07d088d0f98bb9100fc31616b10151d95ba77577d4b0c67db2f43c664"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "bech32 0.11.0",
  "borsh",
@@ -4410,9 +4406,8 @@ dependencies = [
 
 [[package]]
 name = "namada_ethereum_bridge"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eeb49f7a94c8bac46f7d4a78bb432412340996b83355cd333b406acb6a166204"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "ethers",
@@ -4439,9 +4434,8 @@ dependencies = [
 
 [[package]]
 name = "namada_events"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cffb996dc93beed802b0ebc9093f7480cf16ad3c73fd9176af7fad705886583b"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "namada_core",
@@ -4454,9 +4448,8 @@ dependencies = [
 
 [[package]]
 name = "namada_gas"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "429b267efddcb8b7ade3fbb16ceaa543eafe5bc22b2aeda6fbca21ca0c4368f3"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "namada_core",
@@ -4468,9 +4461,8 @@ dependencies = [
 
 [[package]]
 name = "namada_governance"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d8fb47a3a9ad5217470c68e9b47d0f0d0c81b906c26999044eca3750e36a30c"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "itertools 0.14.0",
@@ -4492,9 +4484,8 @@ dependencies = [
 
 [[package]]
 name = "namada_ibc"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66f077333e403267091ed9db4a0b786273ea8da8a1164bb86f3ba398e2139087"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "data-encoding",
@@ -4528,9 +4519,8 @@ dependencies = [
 
 [[package]]
 name = "namada_io"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83a83bee0d6793e8f5a3ebe83e1a16119fa998bada374b1ce7da3082fb4e372b"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "async-trait",
  "kdam",
@@ -4542,9 +4532,8 @@ dependencies = [
 
 [[package]]
 name = "namada_macros"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "713a7c58a2f3e801d4bfb11ff04bed7c674368800ea4b4edf00d1f1a77e7500a"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "data-encoding",
  "proc-macro2",
@@ -4555,9 +4544,8 @@ dependencies = [
 
 [[package]]
 name = "namada_merkle_tree"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "015d5bd2c06167f7f6bf47017c0221956e05399af2cf7481802e883178152d10"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "eyre",
@@ -4571,9 +4559,8 @@ dependencies = [
 
 [[package]]
 name = "namada_parameters"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3505786793edaa9efb6810b1bed10db9848d58d97481e4306646311d7f53c53a"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "namada_core",
  "namada_macros",
@@ -4587,9 +4574,8 @@ dependencies = [
 
 [[package]]
 name = "namada_proof_of_stake"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de1a71a1e875d6716c43217870c4b0f48a2f6e9bd64440ba4ec4c0257e8c1ebe"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "itertools 0.14.0",
@@ -4612,18 +4598,16 @@ dependencies = [
 
 [[package]]
 name = "namada_replay_protection"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0be426ad51a235dc34d29422ee5568d9c5bbae89ae057614ce076541a0a6687"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "namada_core",
 ]
 
 [[package]]
 name = "namada_sdk"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09a20424b35946d2b4bc71bebf5da7d29d9e940ee1d4bb63be0ca1bcd2c6bebd"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "async-trait",
  "bech32 0.11.0",
@@ -4693,9 +4677,8 @@ dependencies = [
 
 [[package]]
 name = "namada_shielded_token"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "365100d5249f320f43bef27af0f10bbcb1a34660e787a4370e01a6a4ff48e80c"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "async-trait",
  "borsh",
@@ -4735,9 +4718,8 @@ dependencies = [
 
 [[package]]
 name = "namada_state"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d33311b2c0e69cffca41ea02d766842d8c76b0ee4709d9979ae18a7f5a57f66"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "clru",
@@ -4759,9 +4741,8 @@ dependencies = [
 
 [[package]]
 name = "namada_storage"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd75a52a7cf559552531f426540e65d5319d1205d6720b0e73c86a8d3b54b745"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "itertools 0.14.0",
@@ -4779,9 +4760,8 @@ dependencies = [
 
 [[package]]
 name = "namada_systems"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8efe52efb02d8f690a3ff8e66e5ca76c3f20ca08f1c51727f7e5df24af5bfbc5"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "namada_core",
  "namada_events",
@@ -4790,9 +4770,8 @@ dependencies = [
 
 [[package]]
 name = "namada_token"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40936e9c720b2c8dc1a485785dd0eb3c7b303b39f4354a938e118b98b8ed146b"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "namada_core",
@@ -4809,9 +4788,8 @@ dependencies = [
 
 [[package]]
 name = "namada_trans_token"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e08c1df33aa4945fe1930e3fbeaf82eef23cc03a7947ed39446c1eae077a3406"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "konst",
  "namada_core",
@@ -4827,9 +4805,8 @@ dependencies = [
 
 [[package]]
 name = "namada_tx"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17c34662abcf0ec42b31d24db4947b9b6a1ed358a607deb12caccb11f40845d1"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "ark-bls12-381",
  "bitflags 2.9.0",
@@ -4857,9 +4834,8 @@ dependencies = [
 
 [[package]]
 name = "namada_tx_env"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2adc84a3facc292913273aed31308901f4768da7094a9421cb9f0b26c33901ac"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "namada_core",
  "namada_events",
@@ -4868,9 +4844,8 @@ dependencies = [
 
 [[package]]
 name = "namada_vm"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1ebf6fb3200ed683021f02055733c6f3e83d8e4c1e3495c04f0809345cddc32"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "clru",
@@ -4891,9 +4866,8 @@ dependencies = [
 
 [[package]]
 name = "namada_vote_ext"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1e9d839db71e00bba201e40a4901a07dd90b2247cb29dc865d71947cc9b1ffe"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "borsh",
  "namada_core",
@@ -4904,9 +4878,8 @@ dependencies = [
 
 [[package]]
 name = "namada_vp"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c44d0dfc36cac54942b616811b8dcaa87a0570a44d40790ecafa4a0879b0fa06"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "namada_core",
  "namada_events",
@@ -4921,9 +4894,8 @@ dependencies = [
 
 [[package]]
 name = "namada_vp_env"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d91311bee2c290bd8fe85dd958fa9786b4c318bebd3fd7f0e41754a021ccbe68"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "derivative",
  "masp_primitives",
@@ -4937,9 +4909,8 @@ dependencies = [
 
 [[package]]
 name = "namada_wallet"
-version = "0.47.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5850c17a1caae8363f6f27cde53637c6254c917d97a35505f12dfe094456557"
+version = "0.47.0"
+source = "git+https://github.com/anoma/namada?branch=grarco%2Ffix-masp-events#4d9efbd24daa58662e04237dbe2d87528512b762"
 dependencies = [
  "bimap",
  "borsh",
@@ -6024,7 +5995,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "h2 0.4.8",
- "http 1.2.0",
+ "http 1.3.0",
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.6.0",
