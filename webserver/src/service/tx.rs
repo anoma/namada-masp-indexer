@@ -19,8 +19,9 @@ impl TxService {
         &self,
         from_block_height: u64,
         to_block_height: u64,
-    ) -> anyhow::Result<impl IntoIterator<Item = (Vec<(u64, Vec<u8>)>, u64, u64)>>
-    {
+    ) -> anyhow::Result<
+        impl IntoIterator<Item = (Vec<(u64, bool, Vec<u8>)>, u64, u64)>,
+    > {
         Ok(self
             .tx_repo
             .get_txs(from_block_height as i32, to_block_height as i32)
@@ -36,7 +37,13 @@ impl TxService {
             .into_iter()
             .map(|((block_height, block_index), tx_batch)| {
                 let tx_batch: Vec<_> = tx_batch
-                    .map(|tx| (tx.masp_tx_index as u64, tx.tx_bytes))
+                    .map(|tx| {
+                        (
+                            tx.masp_tx_index as u64,
+                            tx.is_masp_fee_payment,
+                            tx.tx_bytes,
+                        )
+                    })
                     .collect();
                 (tx_batch, block_height as u64, block_index as u64)
             })

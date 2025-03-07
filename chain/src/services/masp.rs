@@ -8,24 +8,7 @@ use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 
-pub fn update_commitment_tree(
-    commitment_tree: &CommitmentTree,
-    stx_batch: &Transaction,
-) -> anyhow::Result<()> {
-    for so in stx_batch
-        .sapling_bundle()
-        .map_or(&vec![], |x| &x.shielded_outputs)
-    {
-        let node = Node::new(so.cmu.to_repr());
-        if !commitment_tree.append(node) {
-            anyhow::bail!("Note commitment tree is full");
-        }
-    }
-
-    Ok(())
-}
-
-pub fn update_witness_map_and_note_index(
+pub fn update_witness_map(
     commitment_tree: &CommitmentTree,
     tx_notes_index: &mut TxNoteMap,
     witness_map: &WitnessMap,
@@ -47,6 +30,10 @@ pub fn update_witness_map_and_note_index(
         witness_map.update(node).map_err(|note_pos| {
             anyhow::anyhow!("Witness map is full at note position {note_pos}")
         })?;
+
+        if !commitment_tree.append(node) {
+            anyhow::bail!("Note commitment tree is full");
+        }
 
         // Finally, make it easier to construct merkle paths to this new
         // note
