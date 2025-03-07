@@ -12,6 +12,7 @@ pub struct TxDb {
     pub tx_bytes: Vec<u8>,
     pub block_height: i32,
     pub masp_tx_index: i32,
+    pub is_masp_fee_payment: bool,
 }
 
 #[derive(Serialize, Insertable, Clone)]
@@ -22,4 +23,5 @@ pub struct TxInsertDb {
     pub tx_bytes: Vec<u8>,
     pub block_height: i32,
     pub masp_tx_index: i32,
+    pub is_masp_fee_payment: bool,
 }
