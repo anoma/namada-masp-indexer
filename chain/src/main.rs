@@ -262,7 +262,7 @@ async fn build_and_commit_masp_data_at_height(
 
     for Transaction {
         masp_tx,
-        indexed_tx,
+        masp_indexed_tx,
         ..
     } in block_data.transactions.into_iter()
     {
@@ -270,12 +270,12 @@ async fn build_and_commit_masp_data_at_height(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
-            indexed_tx,
+            masp_indexed_tx.indexed_tx,
             &masp_tx,
         )
         .into_masp_error()?;
 
-        shielded_txs.push((indexed_tx, masp_tx));
+        shielded_txs.push((masp_indexed_tx, masp_tx));
     }
 
     db_service::commit(
