@@ -3,7 +3,6 @@ pub mod config;
 pub mod entity;
 pub mod services;
 
-use std::collections::BTreeMap;
 use std::env;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicBool};
@@ -253,7 +252,7 @@ async fn build_and_commit_masp_data_at_height(
         block_data
     };
 
-    let mut shielded_txs = BTreeMap::new();
+    let mut shielded_txs = Vec::new();
     let mut tx_notes_index = TxNoteMap::default();
     let num_transactions = block_data.transactions.len();
 
@@ -265,7 +264,7 @@ async fn build_and_commit_masp_data_at_height(
 
     for Transaction {
         masp_tx,
-        indexed_tx,
+        masp_indexed_tx,
         ..
     } in block_data.transactions.into_iter()
     {
@@ -273,12 +272,12 @@ async fn build_and_commit_masp_data_at_height(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
-            indexed_tx,
+            masp_indexed_tx.indexed_tx,
             &masp_tx,
         )
         .into_masp_error()?;
 
-        shielded_txs.insert(indexed_tx, masp_tx);
+        shielded_txs.push((masp_indexed_tx, masp_tx));
     }
 
     let first_checkpoint = Instant::now();

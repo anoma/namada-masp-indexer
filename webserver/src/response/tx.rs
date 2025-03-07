@@ -15,12 +15,13 @@ pub struct Tx {
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct TxSlot {
     pub masp_tx_index: u64,
+    pub is_masp_fee_payment: bool,
     pub bytes: Vec<u8>,
 }
 
 impl TxResponse {
     pub fn new(
-        txs: impl IntoIterator<Item = (Vec<(u64, Vec<u8>)>, u64, u64)>,
+        txs: impl IntoIterator<Item = (Vec<(u64, bool, Vec<u8>)>, u64, u64)>,
     ) -> Self {
         Self {
             txs: txs
@@ -28,9 +29,12 @@ impl TxResponse {
                 .map(|(batch, block_height, block_index)| Tx {
                     batch: batch
                         .into_iter()
-                        .map(|(masp_tx_index, bytes)| TxSlot {
-                            masp_tx_index,
-                            bytes,
+                        .map(|(masp_tx_index, is_masp_fee_payment, bytes)| {
+                            TxSlot {
+                                masp_tx_index,
+                                is_masp_fee_payment,
+                                bytes,
+                            }
                         })
                         .collect(),
                     block_height,

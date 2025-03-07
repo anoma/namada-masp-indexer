@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use anyhow::{Context, anyhow};
 use deadpool_diesel::postgres::Object;
@@ -21,7 +21,7 @@ use orm::tx::TxInsertDb;
 use orm::witness::WitnessDb;
 use shared::error::ContextDbInteractError;
 use shared::height::BlockHeight;
-use shared::indexed_tx::IndexedTx;
+use shared::indexed_tx::MaspIndexedTx;
 
 use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
@@ -182,7 +182,7 @@ pub async fn commit(
     commitment_tree: CommitmentTree,
     witness_map: WitnessMap,
     notes_index: TxNoteMap,
-    shielded_txs: BTreeMap<IndexedTx, Transaction>,
+    shielded_txs: Vec<(MaspIndexedTx, Transaction)>,
 ) -> anyhow::Result<()> {
     tracing::info!(
         block_height = %chain_state.block_height,
@@ -260,11 +260,20 @@ pub async fn commit(
 
                     let shielded_txs_db = shielded_txs
                         .iter()
-                        .map(|(index, tx)| TxInsertDb {
-                            block_index: index.block_index.0 as i32,
-                            tx_bytes: tx.serialize_to_vec(),
-                            block_height: index.block_height.0 as i32,
-                            masp_tx_index: index.masp_tx_index.0 as i32,
+                        .map(|(MaspIndexedTx { kind, indexed_tx }, tx)| {
+                            let is_masp_fee_payment = match kind {
+                                shared::indexed_tx::MaspEventKind::FeePayment => true,
+                                shared::indexed_tx::MaspEventKind::Transfer => false,
+                            };
+
+                            TxInsertDb {
+                                block_index: indexed_tx.block_index.0 as i32,
+                                tx_bytes: tx.serialize_to_vec(),
+                                block_height: indexed_tx.block_height.0 as i32,
+                                masp_tx_index: indexed_tx.masp_tx_index.0
+                                    as i32,
+                                is_masp_fee_payment,
+                            }
                         })
                         .collect::<Vec<TxInsertDb>>();
                     diesel::insert_into(schema::tx::table)
