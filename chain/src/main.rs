@@ -44,6 +44,7 @@ async fn main() -> Result<(), MainError> {
         database_url,
         interval,
         verbosity,
+        starting_block_height,
     } = AppConfig::parse();
 
     config::install_tracing_subscriber(verbosity);
@@ -56,7 +57,7 @@ async fn main() -> Result<(), MainError> {
     run_migrations(&app_state).await?;
 
     let (last_block_height, commitment_tree, witness_map) =
-        load_committed_state(&app_state).await?;
+        load_committed_state(&app_state, starting_block_height).await?;
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
@@ -156,6 +157,7 @@ async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
 
 async fn load_committed_state(
     app_state: &AppState,
+    starting_block_height: Option<u64>,
 ) -> Result<(Option<BlockHeight>, CommitmentTree, WitnessMap), MainError> {
     tracing::info!("Loading last committed state from db...");
 
@@ -164,6 +166,11 @@ async fn load_committed_state(
     )
     .await
     .into_db_error()?;
+
+    let last_block_height = std::cmp::max(
+        last_block_height,
+        starting_block_height.map(BlockHeight::from),
+    );
 
     let commitment_tree = db_service::get_last_commitment_tree(
         app_state.get_db_connection().await.into_db_error()?,
