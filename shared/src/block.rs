@@ -35,7 +35,7 @@ impl Block {
 
         for MaspEvent {
             tx_index,
-            kind: _,
+            kind,
             data,
         } in indexed_masp_txs
         {
@@ -53,7 +53,14 @@ impl Block {
                 }
             };
 
-            let tx = Transaction::from_namada_tx(tx, tx_index.into(), &data)?;
+            let tx = Transaction::from_namada_tx(
+                tx,
+                crate::indexed_tx::MaspIndexedTx {
+                    kind: kind.into(),
+                    indexed_tx: tx_index.into(),
+                },
+                &data,
+            )?;
 
             block.transactions.push(tx);
         }
