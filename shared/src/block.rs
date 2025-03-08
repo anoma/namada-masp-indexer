@@ -76,16 +76,17 @@ impl Block {
             None => unreachable!(),
         };
 
-        transaction.masp_txs.get(indexed_tx.masp_tx_index.0)
+        transaction.masp_txs.get(indexed_tx.batch_index)
     }
 
     pub fn indexed_txs(&self) -> impl Iterator<Item = IndexedTx> + '_ {
         self.transactions.iter().flat_map(
             |(block_index, Transaction { masp_txs, .. })| {
-                (0..masp_txs.len()).map(|masp_tx_index| IndexedTx {
+                (0..masp_txs.len()).map(|batch_index| IndexedTx {
                     block_height: self.header.height,
                     block_index: TxIndex(*block_index as _),
-                    masp_tx_index: MaspTxIndex(masp_tx_index),
+                    masp_tx_index: MaspTxIndex(usize::MAX),
+                    batch_index,
                 })
             },
         )

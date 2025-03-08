@@ -26,14 +26,14 @@ pub fn update_commitment_tree(
 }
 
 pub fn update_witness_map_and_note_index(
+    note_pos: &mut usize,
     commitment_tree: &CommitmentTree,
     tx_notes_index: &mut TxNoteMap,
     witness_map: &WitnessMap,
     indexed_tx: IndexedTx,
     shielded: &Transaction,
 ) -> anyhow::Result<()> {
-    let mut note_pos = commitment_tree.size();
-    tx_notes_index.insert(indexed_tx, note_pos);
+    tx_notes_index.insert(indexed_tx, *note_pos);
 
     for so in shielded
         .sapling_bundle()
@@ -52,8 +52,8 @@ pub fn update_witness_map_and_note_index(
         // note
         let witness =
             IncrementalWitness::<Node>::from_tree(&commitment_tree.get_tree());
-        witness_map.insert(note_pos, witness);
-        note_pos += 1;
+        witness_map.insert(*note_pos, witness);
+        *note_pos += 1;
     }
 
     Ok(())
