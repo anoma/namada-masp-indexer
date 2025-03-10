@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use namada_core::masp_primitives::sapling::Node;
 use shared::block::Block;
 use shared::height::BlockHeight;

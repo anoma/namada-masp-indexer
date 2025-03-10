@@ -4,10 +4,10 @@ members = ["block-index", "chain", "shared", "orm", "webserver"]
 
 [workspace.package]
 authors = ["Heliax AG <hello@heliax.dev>"]
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-or-later"
 readme = "README.md"
-version = "1.0.0"
+version = "1.1.0"
 
 [workspace.dependencies]
 anyhow = "1.0.75"
