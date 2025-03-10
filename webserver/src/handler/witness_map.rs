@@ -1,5 +1,5 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use axum_macros::debug_handler;
 use axum_trace_id::TraceId;
 use shared::error::InspectWrap;

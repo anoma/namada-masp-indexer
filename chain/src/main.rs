@@ -5,8 +5,8 @@ pub mod services;
 
 use std::collections::HashSet;
 use std::env;
-use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+use std::sync::atomic::{self, AtomicBool};
 use std::time::Duration;
 
 use anyhow::Context;
@@ -15,12 +15,12 @@ use shared::block::Block;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::indexed_tx::IndexedTx;
-use tendermint_rpc::client::CompatMode;
 use tendermint_rpc::HttpClient;
+use tendermint_rpc::client::CompatMode;
 use tokio::signal;
 use tokio::time::sleep;
-use tokio_retry::strategy::{jitter, FixedInterval};
 use tokio_retry::RetryIf;
+use tokio_retry::strategy::{FixedInterval, jitter};
 
 use crate::appstate::AppState;
 use crate::config::AppConfig;
