@@ -3,24 +3,23 @@ pub mod config;
 pub mod entity;
 pub mod services;
 
-use std::collections::HashSet;
 use std::env;
-use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+use std::sync::atomic::{self, AtomicBool};
 use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use shared::block::Block;
+use services::masp::update_witness_map;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
-use shared::indexed_tx::IndexedTx;
-use tendermint_rpc::client::CompatMode;
+use shared::transaction::Transaction;
 use tendermint_rpc::HttpClient;
+use tendermint_rpc::client::CompatMode;
 use tokio::signal;
 use tokio::time::sleep;
-use tokio_retry::strategy::{jitter, FixedInterval};
 use tokio_retry::RetryIf;
+use tokio_retry::strategy::{FixedInterval, jitter};
 
 use crate::appstate::AppState;
 use crate::config::AppConfig;
@@ -29,8 +28,7 @@ use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 use crate::services::{
-    cometbft as cometbft_service, db as db_service, masp as masp_service,
-    rpc as rpc_service,
+    cometbft as cometbft_service, db as db_service, rpc as rpc_service,
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
@@ -261,29 +259,22 @@ async fn build_and_commit_masp_data_at_height(
         "Processing new masp transactions...",
     );
 
-    let mut note_pos = commitment_tree.size();
-
-    for (new_masp_tx_index, mut indexed_tx) in
-        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
-            .await?
-            .into_iter()
-            .enumerate()
+    for Transaction {
+        masp_tx,
+        masp_indexed_tx,
+        ..
+    } in block_data.transactions.into_iter()
     {
-        let masp_tx = block_data.get_masp_tx(indexed_tx).unwrap();
-
-        indexed_tx.masp_tx_index = new_masp_tx_index.into();
-
-        masp_service::update_witness_map_and_note_index(
-            &mut note_pos,
+        update_witness_map(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
-            indexed_tx,
-            masp_tx,
+            masp_indexed_tx.indexed_tx,
+            &masp_tx,
         )
         .into_masp_error()?;
 
-        shielded_txs.push((indexed_tx, masp_tx.clone()));
+        shielded_txs.push((masp_indexed_tx, masp_tx));
     }
 
     db_service::commit(
@@ -298,72 +289,4 @@ async fn build_and_commit_masp_data_at_height(
     .into_db_error()?;
 
     Ok(())
-}
-
-async fn lookup_valid_commitment_tree(
-    client: &HttpClient,
-    commitment_tree: &CommitmentTree,
-    block: &Block,
-) -> Result<Vec<IndexedTx>, MainError> {
-    use itertools::Itertools;
-
-    let all_indexed_txs: Vec<_> = block.indexed_txs().collect();
-
-    let mut correct_order = Vec::with_capacity(all_indexed_txs.len());
-    let mut fee_unshields = HashSet::with_capacity(all_indexed_txs.len());
-
-    // Guess the set of fee unshieldings at the current height
-    let fee_unshield_sets = all_indexed_txs.iter().copied().powerset();
-
-    for fee_unshield_set in fee_unshield_sets {
-        // Start a new attempt at guessing the root of
-        // the commitment tree
-        commitment_tree.rollback();
-        correct_order.clear();
-        fee_unshields.clear();
-
-        tracing::info!(
-            ?fee_unshield_set,
-            "Checking subset of masp fee unshields to build cmt tree"
-        );
-
-        for indexed_tx in fee_unshield_set {
-            let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
-
-            masp_service::update_commitment_tree(commitment_tree, masp_tx)
-                .into_masp_error()?;
-
-            correct_order.push(indexed_tx);
-            fee_unshields.insert(indexed_tx);
-        }
-
-        for indexed_tx in all_indexed_txs
-            .iter()
-            .copied()
-            // We filter fee unshields out of this loop
-            .filter(|indexed_tx| !fee_unshields.contains(indexed_tx))
-        {
-            let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
-
-            masp_service::update_commitment_tree(commitment_tree, masp_tx)
-                .into_masp_error()?;
-
-            correct_order.push(indexed_tx);
-        }
-
-        if cometbft_service::query_commitment_tree_anchor_existence(
-            client,
-            commitment_tree.root(),
-        )
-        .await
-        .into_masp_error()?
-        {
-            return Ok(correct_order);
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "Couldn't find a valid permutation of fee unshieldings"
-    ))
-    .into_masp_error()
 }
