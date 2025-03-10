@@ -13,6 +13,9 @@ pub struct AppConfig {
     #[clap(long, env)]
     pub interval: Option<u64>,
 
+    #[clap(long, env)]
+    pub starting_block_height: Option<u64>,
+
     #[command(flatten)]
     pub verbosity: Verbosity<InfoLevel>,
 }
