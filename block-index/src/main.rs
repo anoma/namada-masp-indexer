@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Poll, Waker};
 use std::time::Duration;
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use clap::Parser;
 use deadpool_diesel::postgres::Object;
 use orm::block_index::BlockIndex;
@@ -159,7 +159,7 @@ fn must_exit() -> impl Future<Output = ()> {
 
 async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
     use diesel_migrations::{
-        embed_migrations, EmbeddedMigrations, MigrationHarness,
+        EmbeddedMigrations, MigrationHarness, embed_migrations,
     };
 
     const MIGRATIONS: EmbeddedMigrations =

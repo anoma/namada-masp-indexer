@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use deadpool_diesel::postgres::Object;
 use diesel::connection::DefaultLoadingMode as DbDefaultLoadingMode;
 use diesel::dsl::max;
@@ -9,7 +9,7 @@ use diesel::{
     RunQueryDsl, SelectableHelper,
 };
 use diesel_migrations::{
-    embed_migrations, EmbeddedMigrations, MigrationHarness,
+    EmbeddedMigrations, MigrationHarness, embed_migrations,
 };
 use namada_sdk::borsh::{BorshDeserialize, BorshSerializeExt};
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;

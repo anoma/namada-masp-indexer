@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use shared::block::Block;
 use shared::height::BlockHeight;
 use tendermint_rpc::endpoint::{block, block_results};
