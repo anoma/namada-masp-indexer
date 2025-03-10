@@ -21,6 +21,7 @@ jobs:
           [
             { image: chain, context: chain },
             { image: webserver, context: webserver },
+            { image: block-index-builder, context: block-index },
           ]
 
     steps:
@@ -42,7 +43,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.docker.context }}/Dockerfile
-          push: ${{ github.ref == 'refs/heads/master' }}
+          push: true
           tags: ${{ env.REGISTRY_URL }}/anoma/namada-masp-indexer:${{ matrix.docker.image }}-${{ steps.get_version.outputs.version-without-v }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
