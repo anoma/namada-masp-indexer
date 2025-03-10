@@ -22,7 +22,7 @@ impl Block {
         raw_block: block::Response,
         raw_results: block_results::Response,
     ) -> Result<Self, String> {
-        let indexed_masp_txs = locate_masp_txs(&raw_results);
+        let indexed_masp_txs = locate_masp_txs(&raw_results)?;
 
         let mut block = Block {
             hash: Id::from(raw_block.block_id.hash),
