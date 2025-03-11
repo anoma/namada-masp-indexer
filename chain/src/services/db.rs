@@ -272,7 +272,7 @@ pub async fn commit(
                                 block_height: indexed_tx.block_height.0 as i32,
                                 masp_tx_index: indexed_tx.masp_tx_index.0
                                     as i32,
-                                is_masp_fee_payment ,
+                                is_masp_fee_payment,
                             }
                         })
                         .collect::<Vec<TxInsertDb>>();
