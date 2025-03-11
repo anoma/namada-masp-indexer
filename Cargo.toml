@@ -27,6 +27,7 @@ namada_core = { version = "0.47.1" }
 namada_sdk = { version = "0.47.1", default-features = false, features = ["std", "async-send", "download-params"] }
 namada_tx = { version = "0.47.1" }
 orm = { path = "orm" }
+rayon = "1.10.0"
 serde = { version = "1.0.138", features = [ "derive" ] }
 serde_json = "1.0"
 shared = { path = "shared" }
