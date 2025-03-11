@@ -1,9 +1,9 @@
 use crate::height::BlockHeight;
 use crate::tx_index::{MaspTxIndex, TxIndex};
 
-/// MASP event kind
+/// The type of a MASP transaction
 #[derive(Debug, Default, Copy, Clone, PartialOrd, PartialEq, Eq, Ord, Hash)]
-pub enum MaspEventKind {
+pub enum MaspTxKind {
     /// A MASP transaction used for fee payment
     FeePayment,
     /// A general MASP transfer
@@ -14,7 +14,7 @@ pub enum MaspEventKind {
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MaspIndexedTx {
     /// The masp tx kind, fee-payment or transfer
-    pub kind: MaspEventKind,
+    pub kind: MaspTxKind,
     /// The pointer to the inner tx carrying this masp tx
     pub indexed_tx: IndexedTx,
 }
@@ -40,15 +40,13 @@ impl From<namada_tx::IndexedTx> for IndexedTx {
     }
 }
 
-impl From<namada_tx::event::MaspEventKind> for MaspEventKind {
+impl From<namada_tx::event::MaspEventKind> for MaspTxKind {
     fn from(value: namada_tx::event::MaspEventKind) -> Self {
         match value {
             namada_tx::event::MaspEventKind::FeePayment => {
-                MaspEventKind::FeePayment
+                MaspTxKind::FeePayment
             }
-            namada_tx::event::MaspEventKind::Transfer => {
-                MaspEventKind::Transfer
-            }
+            namada_tx::event::MaspEventKind::Transfer => MaspTxKind::Transfer,
         }
     }
 }

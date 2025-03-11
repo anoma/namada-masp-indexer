@@ -262,8 +262,12 @@ pub async fn commit(
                         .iter()
                         .map(|(MaspIndexedTx { kind, indexed_tx }, tx)| {
                             let is_masp_fee_payment = match kind {
-                                shared::indexed_tx::MaspEventKind::FeePayment => true,
-                                shared::indexed_tx::MaspEventKind::Transfer => false,
+                                shared::indexed_tx::MaspTxKind::FeePayment => {
+                                    true
+                                }
+                                shared::indexed_tx::MaspTxKind::Transfer => {
+                                    false
+                                }
                             };
 
                             TxInsertDb {
