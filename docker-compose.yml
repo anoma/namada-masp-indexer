@@ -18,7 +18,8 @@ services:
       - type: volume
         source: postgres-data
         target: /var/lib/postgresql/data
-
+    restart: unless-stopped
+    
   block-index:
     image: namada-masp-block-index
     build:
@@ -32,6 +33,7 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
   webserver:
     image: namada-masp-webserver
@@ -64,6 +66,7 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
 volumes:
   postgres-data:
