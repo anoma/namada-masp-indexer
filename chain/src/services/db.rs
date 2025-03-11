@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use deadpool_diesel::postgres::Object;
 use diesel::connection::DefaultLoadingMode as DbDefaultLoadingMode;
 use diesel::dsl::max;
@@ -9,7 +9,7 @@ use diesel::{
     RunQueryDsl, SelectableHelper,
 };
 use diesel_migrations::{
-    embed_migrations, EmbeddedMigrations, MigrationHarness,
+    EmbeddedMigrations, MigrationHarness, embed_migrations,
 };
 use namada_sdk::borsh::{BorshDeserialize, BorshSerializeExt};
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
@@ -182,7 +182,7 @@ pub async fn commit(
     commitment_tree: CommitmentTree,
     witness_map: WitnessMap,
     notes_index: TxNoteMap,
-    shielded_txs: BTreeMap<IndexedTx, Transaction>,
+    shielded_txs: Vec<(IndexedTx, Transaction)>,
 ) -> anyhow::Result<()> {
     tracing::info!(
         block_height = %chain_state.block_height,

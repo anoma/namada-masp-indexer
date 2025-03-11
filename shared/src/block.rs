@@ -1,12 +1,15 @@
 use std::fmt::Display;
 
+use namada_core::masp_primitives::transaction::Transaction as NamadaMaspTransaction;
 use namada_sdk::events::extend::IndexedMaspData;
 use tendermint_rpc::endpoint::{block, block_results};
 
 use crate::block_results::locate_masp_txs;
 use crate::header::BlockHeader;
 use crate::id::Id;
+use crate::indexed_tx::IndexedTx;
 use crate::transaction::Transaction;
+use crate::tx_index::{MaspTxIndex, TxIndex};
 
 #[derive(Debug, Clone, Default)]
 pub struct Block {
@@ -40,7 +43,53 @@ impl Block {
             block.transactions.push((block_index, tx));
         }
 
+        block
+            .transactions
+            .sort_unstable_by_key(|(tx_index, _)| *tx_index);
+
         Ok(block)
+    }
+
+    pub fn get_masp_tx(
+        &self,
+        indexed_tx: IndexedTx,
+    ) -> Option<&NamadaMaspTransaction> {
+        #[cold]
+        fn unlikely<T, F: FnOnce() -> T>(f: F) -> T {
+            f()
+        }
+
+        if self.header.height != indexed_tx.block_height {
+            return unlikely(|| None);
+        }
+
+        let found_at_index = self
+            .transactions
+            .binary_search_by_key(
+                &indexed_tx.block_index,
+                |(block_index, _)| TxIndex(*block_index as _),
+            )
+            .ok()?;
+
+        let (_, transaction) = match self.transactions.get(found_at_index) {
+            Some(tx) => tx,
+            None => unreachable!(),
+        };
+
+        transaction.masp_txs.get(indexed_tx.batch_index)
+    }
+
+    pub fn indexed_txs(&self) -> impl Iterator<Item = IndexedTx> + '_ {
+        self.transactions.iter().flat_map(
+            |(block_index, Transaction { masp_txs, .. })| {
+                (0..masp_txs.len()).map(|batch_index| IndexedTx {
+                    block_height: self.header.height,
+                    block_index: TxIndex(*block_index as _),
+                    masp_tx_index: MaspTxIndex(usize::MAX),
+                    batch_index,
+                })
+            },
+        )
     }
 }
 

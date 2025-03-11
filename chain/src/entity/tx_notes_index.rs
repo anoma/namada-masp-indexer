@@ -23,14 +23,15 @@ impl TxNoteMap {
                     &IndexedTx {
                         block_height,
                         block_index,
-                        masp_tx_index,
+                        batch_index,
+                        ..
                     },
                     &note_pos,
                 )| NotesIndexInsertDb {
                     block_index: block_index.0 as i32,
                     note_position: note_pos as i32,
                     block_height: block_height.0 as i32,
-                    masp_tx_index: masp_tx_index.0 as i32,
+                    masp_tx_index: batch_index as i32,
                 },
             )
             .collect()

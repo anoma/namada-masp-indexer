@@ -1,7 +1,7 @@
 openapi: '3.0.2'
 info:
   title: Masp Indexer
-  version: '1.0'
+  version: '1.1'
 servers:
   - url: https://localhost:5000/api/v1
 paths:

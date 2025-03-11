@@ -40,6 +40,10 @@ impl InnerCommitmentTree {
         self.transactional.as_ref().size()
     }
 
+    fn root(&self) -> Node {
+        self.transactional.as_ref().root()
+    }
+
     fn get_tree(&self) -> MaspCommitmentTree<Node> {
         self.transactional.as_ref().clone()
     }
@@ -70,6 +74,10 @@ impl CommitmentTree {
 
     pub fn size(&self) -> usize {
         self.0.lock().unwrap().size()
+    }
+
+    pub fn root(&self) -> Node {
+        self.0.lock().unwrap().root()
     }
 
     pub fn append(&self, node: Node) -> bool {

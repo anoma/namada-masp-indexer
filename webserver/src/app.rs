@@ -11,9 +11,9 @@ use axum::{BoxError, Json, Router};
 use axum_trace_id::SetTraceIdLayer;
 use lazy_static::lazy_static;
 use serde_json::json;
+use tower::ServiceBuilder;
 use tower::buffer::BufferLayer;
 use tower::limit::RateLimitLayer;
-use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
@@ -70,7 +70,7 @@ impl ApplicationServer {
             .nest("/api/v1", routes)
             .merge(Router::new().route(
                 "/health",
-                get(|| async { env!("VERGEN_GIT_SHA").to_string() }),
+                get(|| async { json!({"commit": env!("VERGEN_GIT_SHA").to_string(), "version": env!("CARGO_PKG_VERSION") }).to_string() }),
             ))
             .with_state(app_state)
             .layer(

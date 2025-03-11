@@ -1,5 +1,6 @@
 use namada_core::masp_primitives::ff::PrimeField;
 use namada_core::masp_primitives::sapling::Node;
+use namada_core::masp_primitives::transaction::Transaction;
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
 use shared::indexed_tx::IndexedTx;
 
@@ -7,17 +8,32 @@ use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 
-/// Update the merkle tree of witnesses the first time we
-/// scan a new MASP transaction.
-pub fn update_witness_map(
+pub fn update_commitment_tree(
+    commitment_tree: &CommitmentTree,
+    stx_batch: &Transaction,
+) -> anyhow::Result<()> {
+    for so in stx_batch
+        .sapling_bundle()
+        .map_or(&vec![], |x| &x.shielded_outputs)
+    {
+        let node = Node::new(so.cmu.to_repr());
+        if !commitment_tree.append(node) {
+            anyhow::bail!("Note commitment tree is full");
+        }
+    }
+
+    Ok(())
+}
+
+pub fn update_witness_map_and_note_index(
+    note_pos: &mut usize,
     commitment_tree: &CommitmentTree,
     tx_notes_index: &mut TxNoteMap,
     witness_map: &WitnessMap,
     indexed_tx: IndexedTx,
-    shielded: &namada_core::masp_primitives::transaction::Transaction,
+    shielded: &Transaction,
 ) -> anyhow::Result<()> {
-    let mut note_pos = commitment_tree.size();
-    tx_notes_index.insert(indexed_tx, note_pos);
+    tx_notes_index.insert(indexed_tx, *note_pos);
 
     for so in shielded
         .sapling_bundle()
@@ -32,16 +48,12 @@ pub fn update_witness_map(
             anyhow::anyhow!("Witness map is full at note position {note_pos}")
         })?;
 
-        if !commitment_tree.append(node) {
-            anyhow::bail!("Note commitment tree is full");
-        }
-
         // Finally, make it easier to construct merkle paths to this new
         // note
         let witness =
             IncrementalWitness::<Node>::from_tree(&commitment_tree.get_tree());
-        witness_map.insert(note_pos, witness);
-        note_pos += 1;
+        witness_map.insert(*note_pos, witness);
+        *note_pos += 1;
     }
 
     Ok(())
