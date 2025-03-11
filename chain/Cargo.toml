@@ -23,16 +23,13 @@ futures.workspace = true
 namada_core.workspace = true
 namada_sdk.workspace = true
 orm.workspace = true
-rayon.workspace = true
 shared.workspace = true
 tendermint-rpc.workspace = true
-tendermint.workspace = true
 tokio-retry.workspace = true
 tokio.workspace = true 
 tracing-subscriber.workspace = true
 tracing.workspace = true
 tryhard.workspace = true
-itertools.workspace = true
 
 [build-dependencies]
 vergen = { workspace = true, features = ["build", "git", "gitcl"] }
