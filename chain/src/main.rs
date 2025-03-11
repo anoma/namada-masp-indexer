@@ -261,20 +261,20 @@ async fn build_and_commit_masp_data_at_height(
         "Processing new masp transactions...",
     );
 
-    let mut note_pos = commitment_tree.size();
+    let ordered_txs =
+        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
+            .await?;
+
+    commitment_tree.rollback();
 
     for (new_masp_tx_index, mut indexed_tx) in
-        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
-            .await?
-            .into_iter()
-            .enumerate()
+        ordered_txs.into_iter().enumerate()
     {
         let masp_tx = block_data.get_masp_tx(indexed_tx).unwrap();
 
         indexed_tx.masp_tx_index = new_masp_tx_index.into();
 
-        masp_service::update_witness_map_and_note_index(
-            &mut note_pos,
+        masp_service::update_witness_map(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
@@ -285,6 +285,8 @@ async fn build_and_commit_masp_data_at_height(
 
         shielded_txs.push((indexed_tx, masp_tx.clone()));
     }
+
+    query_witness_map_anchor_existence(&client, &witness_map).await?;
 
     db_service::commit(
         &conn_obj,
@@ -366,4 +368,43 @@ async fn lookup_valid_commitment_tree(
         "Couldn't find a valid permutation of fee unshieldings"
     ))
     .into_masp_error()
+}
+
+async fn query_witness_map_anchor_existence(
+    client: &Arc<HttpClient>,
+    witness_map: &WitnessMap,
+) -> Result<(), MainError> {
+    // NB: before we commit, let's check the roots
+    // of the inner commitment trees in the witness map
+    const NUMBER_OF_ROOTS_TO_CHECK: usize = 20;
+
+    let witness_map_roots = witness_map.roots(NUMBER_OF_ROOTS_TO_CHECK);
+
+    futures::future::try_join_all(witness_map_roots.into_iter().map(
+        |(note_index, witness_map_root)| {
+            let client = Arc::clone(client);
+            async move {
+                let exists =
+                    cometbft_service::query_commitment_tree_anchor_existence(
+                        &client,
+                        witness_map_root,
+                    )
+                    .await?;
+
+                Ok((note_index, exists))
+            }
+        },
+    ))
+    .await
+    .into_rpc_error()?
+    .into_iter()
+    .try_for_each(|(note_index, anchor_exists)| {
+        if !anchor_exists {
+            anyhow::bail!("No anchor could be found for witness {note_index}");
+        }
+        Ok(())
+    })
+    .into_masp_error()?;
+
+    Ok(())
 }
