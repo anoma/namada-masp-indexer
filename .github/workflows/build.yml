@@ -103,9 +103,9 @@ jobs:
       matrix:
         docker:
           [
-            { image: chain, context: chain },
-            { image: webserver, context: webserver },
-            { image: block-index-builder, context: block-index },
+            { image: chain, context: chain, cache_scope: "chain" },
+            { image: webserver, context: webserver, cache_scope: "webserver" },
+            { image: block-index-builder, context: block-index, cache_scope: "block-index" },
           ]
 
     steps:
@@ -140,8 +140,8 @@ jobs:
           push: ${{ github.event.pull_request.head.repo.full_name == 'anoma/namada-masp-indexer' || github.event_name == 'push'  }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.docker.cache_scope }}
+          cache-to: type=gha,scope=${{ matrix.docker.cache_scope }},mode=max
 
   can_enqueue:
     needs: [clippy, format, build, validate-swagger]
