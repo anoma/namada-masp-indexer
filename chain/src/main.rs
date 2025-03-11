@@ -261,20 +261,20 @@ async fn build_and_commit_masp_data_at_height(
         "Processing new masp transactions...",
     );
 
-    let mut note_pos = commitment_tree.size();
+    let ordered_txs =
+        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
+            .await?;
+
+    commitment_tree.rollback();
 
     for (new_masp_tx_index, mut indexed_tx) in
-        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
-            .await?
-            .into_iter()
-            .enumerate()
+        ordered_txs.into_iter().enumerate()
     {
         let masp_tx = block_data.get_masp_tx(indexed_tx).unwrap();
 
         indexed_tx.masp_tx_index = new_masp_tx_index.into();
 
-        masp_service::update_witness_map_and_note_index(
-            &mut note_pos,
+        masp_service::update_witness_map(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
