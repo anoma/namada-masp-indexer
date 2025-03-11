@@ -46,8 +46,8 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY_URL }}/anoma/namada-masp-indexer:${{ matrix.docker.image }}-${{ steps.get_version.outputs.version-without-v }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.images.cache_scope }}
-          cache-to: type=gha,scope=${{ matrix.images.cache_scope }},mode=max
+          cache-from: type=gha,scope=${{ matrix.docker.cache_scope }}
+          cache-to: type=gha,scope=${{ matrix.docker.cache_scope }},mode=max
 
   swagger-ui:
     environment:
