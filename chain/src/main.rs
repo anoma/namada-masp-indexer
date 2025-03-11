@@ -44,6 +44,7 @@ async fn main() -> Result<(), MainError> {
         interval,
         verbosity,
         starting_block_height,
+        number_of_witness_map_roots_to_check,
     } = AppConfig::parse();
 
     config::install_tracing_subscriber(verbosity);
@@ -91,6 +92,7 @@ async fn main() -> Result<(), MainError> {
                     commitment_tree,
                     app_state,
                     chain_state,
+                    number_of_witness_map_roots_to_check,
                 )
             },
             |_: &MainError| !must_exit(&exit_handle),
@@ -201,6 +203,7 @@ async fn load_committed_state(
     shared::error::ok((last_block_height, commitment_tree, witness_map))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_and_commit_masp_data_at_height(
     block_height: BlockHeight,
     exit_handle: &AtomicBool,
@@ -209,6 +212,7 @@ async fn build_and_commit_masp_data_at_height(
     commitment_tree: CommitmentTree,
     app_state: AppState,
     chain_state: ChainState,
+    number_of_witness_map_roots_to_check: usize,
 ) -> Result<(), MainError> {
     if must_exit(exit_handle) {
         return Ok(());
@@ -265,6 +269,8 @@ async fn build_and_commit_masp_data_at_height(
         lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
             .await?;
 
+    let anything_to_commit = !ordered_txs.is_empty();
+
     commitment_tree.rollback();
 
     for (new_masp_tx_index, mut indexed_tx) in
@@ -286,7 +292,14 @@ async fn build_and_commit_masp_data_at_height(
         shielded_txs.push((indexed_tx, masp_tx.clone()));
     }
 
-    query_witness_map_anchor_existence(&client, &witness_map).await?;
+    if anything_to_commit {
+        query_witness_map_anchor_existence(
+            &client,
+            &witness_map,
+            number_of_witness_map_roots_to_check,
+        )
+        .await?;
+    }
 
     db_service::commit(
         &conn_obj,
@@ -373,12 +386,9 @@ async fn lookup_valid_commitment_tree(
 async fn query_witness_map_anchor_existence(
     client: &Arc<HttpClient>,
     witness_map: &WitnessMap,
+    roots_to_check: usize,
 ) -> Result<(), MainError> {
-    // NB: before we commit, let's check the roots
-    // of the inner commitment trees in the witness map
-    const NUMBER_OF_ROOTS_TO_CHECK: usize = 20;
-
-    let witness_map_roots = witness_map.roots(NUMBER_OF_ROOTS_TO_CHECK);
+    let witness_map_roots = witness_map.roots(roots_to_check);
 
     futures::future::try_join_all(witness_map_roots.into_iter().map(
         |(note_index, witness_map_root)| {
