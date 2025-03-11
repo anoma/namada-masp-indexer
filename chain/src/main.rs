@@ -18,7 +18,7 @@ use shared::indexed_tx::IndexedTx;
 use tendermint_rpc::HttpClient;
 use tendermint_rpc::client::CompatMode;
 use tokio::signal;
-use tokio::time::sleep;
+use tokio::time::{Instant, sleep};
 use tokio_retry::RetryIf;
 use tokio_retry::strategy::{FixedInterval, jitter};
 
@@ -218,6 +218,8 @@ async fn build_and_commit_masp_data_at_height(
         return Ok(());
     }
 
+    let start = Instant::now();
+
     // NB: rollback changes from previous failed commit attempts
     witness_map.rollback();
     commitment_tree.rollback();
@@ -259,12 +261,6 @@ async fn build_and_commit_masp_data_at_height(
     let mut shielded_txs = Vec::new();
     let mut tx_notes_index = TxNoteMap::default();
 
-    tracing::info!(
-        %block_height,
-        num_transactions = block_data.transactions.len(),
-        "Processing new masp transactions...",
-    );
-
     let ordered_txs =
         lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
             .await?;
@@ -301,6 +297,15 @@ async fn build_and_commit_masp_data_at_height(
         .into_masp_error()?;
     }
 
+    let first_checkpoint = Instant::now();
+
+    tracing::info!(
+        %block_height,
+        num_transactions = block_data.transactions.len(),
+        time_taken = first_checkpoint.duration_since(start).as_secs_f64(),
+        "Processed new masp transactions...",
+    );
+
     db_service::commit(
         &conn_obj,
         chain_state,
@@ -311,6 +316,16 @@ async fn build_and_commit_masp_data_at_height(
     )
     .await
     .into_db_error()?;
+
+    let second_checkpoint = Instant::now();
+
+    tracing::info!(
+        block_height = %chain_state.block_height,
+        time_taken = second_checkpoint
+            .duration_since(first_checkpoint)
+            .as_secs_f64(),
+        "Committed new block"
+    );
 
     Ok(())
 }
