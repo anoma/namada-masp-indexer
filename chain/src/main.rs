@@ -272,7 +272,7 @@ async fn build_and_commit_masp_data_at_height(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
-            masp_indexed_tx.indexed_tx,
+            masp_indexed_tx,
             &masp_tx,
         )
         .into_masp_error()?;

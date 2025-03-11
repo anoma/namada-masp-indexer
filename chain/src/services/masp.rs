@@ -1,7 +1,7 @@
 use namada_core::masp_primitives::ff::PrimeField;
 use namada_core::masp_primitives::sapling::Node;
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
-use shared::indexed_tx::IndexedTx;
+use shared::indexed_tx::MaspIndexedTx;
 
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
@@ -11,7 +11,7 @@ pub fn update_witness_map(
     commitment_tree: &CommitmentTree,
     tx_notes_index: &mut TxNoteMap,
     witness_map: &WitnessMap,
-    indexed_tx: IndexedTx,
+    indexed_tx: MaspIndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> anyhow::Result<()> {
     let mut note_pos = commitment_tree.size();
