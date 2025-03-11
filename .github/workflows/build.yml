@@ -140,8 +140,8 @@ jobs:
           push: ${{ github.event.pull_request.head.repo.full_name == 'anoma/namada-masp-indexer' || github.event_name == 'push'  }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.images.cache_scope }}
-          cache-to: type=gha,scope=${{ matrix.images.cache_scope }},mode=max
+          cache-from: type=gha,scope=${{ matrix.docker.cache_scope }}
+          cache-to: type=gha,scope=${{ matrix.docker.cache_scope }},mode=max
 
   can_enqueue:
     needs: [clippy, format, build, validate-swagger]
