@@ -293,12 +293,12 @@ async fn build_and_commit_masp_data_at_height(
     }
 
     if anything_to_commit {
-        query_witness_map_anchor_existence(
-            &client,
+        masp_service::query_witness_map_anchor_existence(
             &witness_map,
+            commitment_tree.root(),
             number_of_witness_map_roots_to_check,
         )
-        .await?;
+        .into_masp_error()?;
     }
 
     db_service::commit(
@@ -381,40 +381,4 @@ async fn lookup_valid_commitment_tree(
         "Couldn't find a valid permutation of fee unshieldings"
     ))
     .into_masp_error()
-}
-
-async fn query_witness_map_anchor_existence(
-    client: &Arc<HttpClient>,
-    witness_map: &WitnessMap,
-    roots_to_check: usize,
-) -> Result<(), MainError> {
-    let witness_map_roots = witness_map.roots(roots_to_check);
-
-    futures::future::try_join_all(witness_map_roots.into_iter().map(
-        |(note_index, witness_map_root)| {
-            let client = Arc::clone(client);
-            async move {
-                let exists =
-                    cometbft_service::query_commitment_tree_anchor_existence(
-                        &client,
-                        witness_map_root,
-                    )
-                    .await?;
-
-                Ok((note_index, exists))
-            }
-        },
-    ))
-    .await
-    .into_rpc_error()?
-    .into_iter()
-    .try_for_each(|(note_index, anchor_exists)| {
-        if !anchor_exists {
-            anyhow::bail!("No anchor could be found for witness {note_index}");
-        }
-        Ok(())
-    })
-    .into_masp_error()?;
-
-    Ok(())
 }
