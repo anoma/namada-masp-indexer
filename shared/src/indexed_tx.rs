@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::height::BlockHeight;
 use crate::tx_index::{MaspTxIndex, TxIndex};
 
@@ -11,12 +13,35 @@ pub enum MaspTxKind {
     Transfer,
 }
 
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MaspIndexedTx {
     /// The masp tx kind, fee-payment or transfer
     pub kind: MaspTxKind,
     /// The pointer to the inner tx carrying this masp tx
     pub indexed_tx: IndexedTx,
+}
+
+impl Ord for MaspIndexedTx {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // If txs are in different blocks we just have to compare their block
+        // heights. If instead txs are in the same block, masp fee paying txs
+        // take precedence over transfer masp txs. After that we sort them based
+        // on their indexes
+        self.indexed_tx
+            .block_height
+            .cmp(&other.indexed_tx.block_height)
+            .then(
+                self.kind
+                    .cmp(&other.kind)
+                    .then(self.indexed_tx.cmp(&other.indexed_tx)),
+            )
+    }
+}
+
+impl PartialOrd for MaspIndexedTx {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
