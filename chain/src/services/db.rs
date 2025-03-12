@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use anyhow::{Context, anyhow};
 use deadpool_diesel::postgres::Object;
@@ -182,7 +182,7 @@ pub async fn commit(
     commitment_tree: CommitmentTree,
     witness_map: WitnessMap,
     notes_index: TxNoteMap,
-    shielded_txs: Vec<(MaspIndexedTx, Transaction)>,
+    shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     tracing::info!(
         block_height = %chain_state.block_height,
