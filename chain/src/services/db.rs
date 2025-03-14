@@ -317,5 +317,10 @@ pub async fn commit(
         )
     })?;
 
+    tracing::info!(
+        block_height = %chain_state.block_height,
+        "Committed new block"
+    );
+
     Ok(())
 }
