@@ -217,8 +217,6 @@ async fn build_and_commit_masp_data_at_height(
         return Ok(());
     }
 
-    let start = Instant::now();
-
     // NB: rollback changes from previous failed commit attempts
     witness_map.rollback();
     commitment_tree.rollback();
@@ -241,7 +239,9 @@ async fn build_and_commit_masp_data_at_height(
         return Err(MainError);
     }
 
-    let block_data = {
+    let mut checkpoint = Instant::now();
+
+    let (block_data, num_transactions) = {
         tracing::info!(
             %block_height,
             "Fetching block data from CometBFT"
@@ -250,16 +250,19 @@ async fn build_and_commit_masp_data_at_height(
             cometbft_service::query_masp_txs_in_block(&client, block_height)
                 .await
                 .into_rpc_error()?;
-        tracing::info!(
-            %block_height,
-            "Acquired block data from CometBFT"
-        );
-        block_data
+        with_time_taken(&mut checkpoint, |time_taken| {
+            tracing::info!(
+                time_taken,
+                %block_height,
+                "Acquired block data from CometBFT"
+            );
+        });
+        let num_transactions = block_data.transactions.len();
+        (block_data, num_transactions)
     };
 
     let mut shielded_txs = BTreeMap::new();
     let mut tx_notes_index = TxNoteMap::default();
-    let num_transactions = block_data.transactions.len();
 
     tracing::info!(
         %block_height,
@@ -285,7 +288,17 @@ async fn build_and_commit_masp_data_at_height(
         shielded_txs.insert(masp_indexed_tx, masp_tx);
     }
 
+    with_time_taken(&mut checkpoint, |time_taken| {
+        tracing::info!(
+            %block_height,
+            num_transactions,
+            time_taken,
+            "Processed new masp transactions",
+        );
+    });
+
     validate_masp_state(
+        &mut checkpoint,
         &client,
         &commitment_tree,
         &witness_map,
@@ -293,16 +306,8 @@ async fn build_and_commit_masp_data_at_height(
     )
     .await?;
 
-    let first_checkpoint = Instant::now();
-
-    tracing::info!(
-        %block_height,
-        num_transactions,
-        time_taken = first_checkpoint.duration_since(start).as_secs_f64(),
-        "Processed new masp transactions...",
-    );
-
     db_service::commit(
+        &mut checkpoint,
         &conn_obj,
         chain_state,
         commitment_tree,
@@ -313,26 +318,19 @@ async fn build_and_commit_masp_data_at_height(
     .await
     .into_db_error()?;
 
-    let second_checkpoint = Instant::now();
-
-    tracing::info!(
-        block_height = %chain_state.block_height,
-        time_taken = second_checkpoint
-            .duration_since(first_checkpoint)
-            .as_secs_f64(),
-        "Committed new block"
-    );
-
     Ok(())
 }
 
 async fn validate_masp_state(
+    checkpoint: &mut Instant,
     client: &HttpClient,
     commitment_tree: &CommitmentTree,
     witness_map: &WitnessMap,
     number_of_witness_map_roots_to_check: usize,
 ) -> Result<(), MainError> {
     if commitment_tree.is_dirty() && number_of_witness_map_roots_to_check > 0 {
+        tracing::info!("Validating MASP state...");
+
         let tree_root = tokio::task::block_in_place(|| commitment_tree.root());
 
         let commitment_tree_check_fut = async {
@@ -358,7 +356,22 @@ async fn validate_masp_state(
             .into_tokio_join_error()?
         };
 
-        futures::try_join!(commitment_tree_check_fut, witness_map_check_fut,)?;
+        futures::try_join!(commitment_tree_check_fut, witness_map_check_fut)?;
+
+        with_time_taken(checkpoint, |time_taken| {
+            tracing::info!(time_taken, "Validated MASP state");
+        });
     }
+
     Ok(())
+}
+
+fn with_time_taken<F, T>(checkpoint: &mut Instant, callback: F) -> T
+where
+    F: FnOnce(f64) -> T,
+{
+    let last_checkpoint = std::mem::replace(checkpoint, Instant::now());
+    let time_taken = last_checkpoint.elapsed().as_secs_f64();
+
+    callback(time_taken)
 }

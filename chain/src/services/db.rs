@@ -22,11 +22,13 @@ use orm::witness::WitnessDb;
 use shared::error::ContextDbInteractError;
 use shared::height::BlockHeight;
 use shared::indexed_tx::MaspIndexedTx;
+use tokio::time::Instant;
 
 use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
+use crate::with_time_taken;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../orm/migrations/");
 
@@ -177,6 +179,7 @@ pub async fn get_last_witness_map(conn: Object) -> anyhow::Result<WitnessMap> {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn commit(
+    checkpoint: &mut Instant,
     conn: &Object,
     chain_state: ChainState,
     commitment_tree: CommitmentTree,
@@ -316,6 +319,14 @@ pub async fn commit(
             chain_state.block_height
         )
     })?;
+
+    with_time_taken(checkpoint, |time_taken| {
+        tracing::info!(
+            block_height = %chain_state.block_height,
+            time_taken,
+            "Committed new block"
+        );
+    });
 
     Ok(())
 }
