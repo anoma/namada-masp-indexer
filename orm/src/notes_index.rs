@@ -11,6 +11,7 @@ pub struct NotesIndexDb {
     pub note_position: i32,
     pub block_height: i32,
     pub masp_tx_index: i32,
+    pub is_masp_fee_payment: bool,
 }
 
 #[derive(Serialize, Insertable, Clone)]
@@ -21,4 +22,5 @@ pub struct NotesIndexInsertDb {
     pub note_position: i32,
     pub block_height: i32,
     pub masp_tx_index: i32,
+    pub is_masp_fee_payment: bool,
 }

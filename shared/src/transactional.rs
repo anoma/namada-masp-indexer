@@ -11,6 +11,10 @@ impl<T> Transactional<T> {
             working_copy: None,
         }
     }
+
+    pub const fn is_dirty(&self) -> bool {
+        self.working_copy.is_some()
+    }
 }
 
 impl<T> AsRef<T> for Transactional<T> {

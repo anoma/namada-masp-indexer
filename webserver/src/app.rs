@@ -11,9 +11,9 @@ use axum::{BoxError, Json, Router};
 use axum_trace_id::SetTraceIdLayer;
 use lazy_static::lazy_static;
 use serde_json::json;
+use tower::ServiceBuilder;
 use tower::buffer::BufferLayer;
 use tower::limit::RateLimitLayer;
-use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
