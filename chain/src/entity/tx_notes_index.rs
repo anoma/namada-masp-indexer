@@ -35,10 +35,10 @@ impl TxNoteMap {
                     note_position: note_pos as i32,
                     block_height: block_height.0 as i32,
                     masp_tx_index: masp_tx_index.0 as i32,
-                    is_masp_fee_payment: match kind {
-                        shared::indexed_tx::MaspTxKind::FeePayment => true,
-                        shared::indexed_tx::MaspTxKind::Transfer => false,
-                    },
+                    is_masp_fee_payment: matches!(
+                        kind,
+                        shared::indexed_tx::MaspTxKind::FeePayment
+                    ),
                 },
             )
             .collect()

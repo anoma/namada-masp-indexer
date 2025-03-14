@@ -261,14 +261,10 @@ pub async fn commit(
                     let shielded_txs_db = shielded_txs
                         .iter()
                         .map(|(MaspIndexedTx { kind, indexed_tx }, tx)| {
-                            let is_masp_fee_payment = match kind {
-                                shared::indexed_tx::MaspTxKind::FeePayment => {
-                                    true
-                                }
-                                shared::indexed_tx::MaspTxKind::Transfer => {
-                                    false
-                                }
-                            };
+                            let is_masp_fee_payment = matches!(
+                                kind,
+                                shared::indexed_tx::MaspTxKind::FeePayment
+                            );
 
                             TxInsertDb {
                                 block_index: indexed_tx.block_index.0 as i32,
