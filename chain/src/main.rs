@@ -11,7 +11,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use services::masp::update_witness_map;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::transaction::Transaction;
@@ -29,7 +28,8 @@ use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 use crate::services::{
-    cometbft as cometbft_service, db as db_service, rpc as rpc_service,
+    cometbft as cometbft_service, db as db_service, masp as masp_service,
+    rpc as rpc_service,
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
@@ -43,6 +43,7 @@ async fn main() -> Result<(), MainError> {
         interval,
         verbosity,
         starting_block_height,
+        number_of_witness_map_roots_to_check,
     } = AppConfig::parse();
 
     config::install_tracing_subscriber(verbosity);
@@ -90,6 +91,7 @@ async fn main() -> Result<(), MainError> {
                     commitment_tree,
                     app_state,
                     chain_state,
+                    number_of_witness_map_roots_to_check,
                 )
             },
             |_: &MainError| !must_exit(&exit_handle),
@@ -200,6 +202,7 @@ async fn load_committed_state(
     shared::error::ok((last_block_height, commitment_tree, witness_map))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_and_commit_masp_data_at_height(
     block_height: BlockHeight,
     exit_handle: &AtomicBool,
@@ -208,6 +211,7 @@ async fn build_and_commit_masp_data_at_height(
     commitment_tree: CommitmentTree,
     app_state: AppState,
     chain_state: ChainState,
+    number_of_witness_map_roots_to_check: usize,
 ) -> Result<(), MainError> {
     if must_exit(exit_handle) {
         return Ok(());
@@ -269,7 +273,7 @@ async fn build_and_commit_masp_data_at_height(
         ..
     } in block_data.transactions.into_iter()
     {
-        update_witness_map(
+        masp_service::update_witness_map(
             &commitment_tree,
             &mut tx_notes_index,
             &witness_map,
@@ -280,6 +284,14 @@ async fn build_and_commit_masp_data_at_height(
 
         shielded_txs.insert(masp_indexed_tx, masp_tx);
     }
+
+    validate_masp_state(
+        &client,
+        &commitment_tree,
+        &witness_map,
+        number_of_witness_map_roots_to_check,
+    )
+    .await?;
 
     let first_checkpoint = Instant::now();
 
@@ -311,5 +323,42 @@ async fn build_and_commit_masp_data_at_height(
         "Committed new block"
     );
 
+    Ok(())
+}
+
+async fn validate_masp_state(
+    client: &HttpClient,
+    commitment_tree: &CommitmentTree,
+    witness_map: &WitnessMap,
+    number_of_witness_map_roots_to_check: usize,
+) -> Result<(), MainError> {
+    if commitment_tree.is_dirty() && number_of_witness_map_roots_to_check > 0 {
+        let tree_root = tokio::task::block_in_place(|| commitment_tree.root());
+
+        let commitment_tree_check_fut = async {
+            cometbft_service::query_commitment_tree_anchor_existence(
+                client, tree_root,
+            )
+            .await
+            .into_rpc_error()
+        };
+
+        let witness_map = witness_map.clone();
+        let witness_map_check_fut = async move {
+            tokio::task::spawn_blocking(move || {
+                masp_service::query_witness_map_anchor_existence(
+                    &witness_map,
+                    tree_root,
+                    number_of_witness_map_roots_to_check,
+                )
+                .into_masp_error()
+            })
+            .await
+            .context("Failed to join Tokio task")
+            .into_tokio_join_error()?
+        };
+
+        futures::try_join!(commitment_tree_check_fut, witness_map_check_fut,)?;
+    }
     Ok(())
 }

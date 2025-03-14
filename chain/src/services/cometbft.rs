@@ -1,4 +1,5 @@
 use anyhow::{Context, anyhow};
+use namada_core::masp_primitives::sapling::Node;
 use shared::block::Block;
 use shared::height::BlockHeight;
 use tendermint_rpc::endpoint::{block, block_results};
@@ -34,4 +35,25 @@ async fn query_raw_block_results_at_height(
         .block_results(height)
         .await
         .context("Failed to query CometBFT's block results")
+}
+
+pub async fn query_commitment_tree_anchor_existence(
+    client: &HttpClient,
+    commitment_tree_root: Node,
+) -> anyhow::Result<()> {
+    let anchor_key = namada_sdk::token::storage_key::masp_commitment_anchor_key(
+        commitment_tree_root,
+    );
+
+    if !namada_sdk::rpc::query_has_storage_key(client, &anchor_key)
+        .await
+        .context("Failed to check if commitment tree root is in storage")?
+    {
+        anyhow::bail!(
+            "No commitment tree found with the given root: \
+             {commitment_tree_root:?}"
+        )
+    }
+
+    Ok(())
 }

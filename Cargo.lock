@@ -944,6 +944,7 @@ dependencies = [
  "namada_core",
  "namada_sdk",
  "orm",
+ "rayon",
  "shared",
  "tendermint-rpc",
  "tokio",

@@ -23,6 +23,7 @@ futures.workspace = true
 namada_core.workspace = true
 namada_sdk.workspace = true
 orm.workspace = true
+rayon.workspace = true
 shared.workspace = true
 tendermint-rpc.workspace = true
 tokio-retry.workspace = true

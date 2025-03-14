@@ -22,6 +22,15 @@ impl InnerWitnessMap {
         }
     }
 
+    fn roots(&self, number_of_roots: usize) -> Vec<(usize, Node)> {
+        self.transactional
+            .as_ref()
+            .iter()
+            .take(number_of_roots)
+            .map(|(note_index, witness)| (*note_index, witness.root()))
+            .collect()
+    }
+
     fn size(&self) -> usize {
         self.transactional.as_ref().len()
     }
@@ -69,6 +78,10 @@ pub struct WitnessMap(Arc<Mutex<InnerWitnessMap>>);
 impl WitnessMap {
     pub fn new(witness_map: HashMap<usize, IncrementalWitness<Node>>) -> Self {
         Self(Arc::new(Mutex::new(InnerWitnessMap::new(witness_map))))
+    }
+
+    pub fn roots(&self, number_of_roots: usize) -> Vec<(usize, Node)> {
+        self.0.lock().unwrap().roots(number_of_roots)
     }
 
     pub fn size(&self) -> usize {
