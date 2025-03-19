@@ -33,6 +33,7 @@ tracing-subscriber.workspace = true
 tracing.workspace = true
 tryhard.workspace = true
 itertools.workspace = true
+serde_json.workspace = true
 
 [build-dependencies]
 vergen = { workspace = true, features = ["build", "git", "gitcl"] }

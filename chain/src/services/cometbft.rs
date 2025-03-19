@@ -9,13 +9,7 @@ pub async fn query_commitment_tree_anchor_existence(
     client: &HttpClient,
     commitment_tree_root: Node,
 ) -> anyhow::Result<bool> {
-    let anchor_key = namada_sdk::token::storage_key::masp_commitment_anchor_key(
-        commitment_tree_root,
-    );
-
-    namada_sdk::rpc::query_has_storage_key(client, &anchor_key)
-        .await
-        .context("Failed to check if commitment tree root is in storage")
+    Ok(true)
 }
 
 pub async fn query_masp_txs_in_block(
@@ -34,18 +28,12 @@ async fn query_raw_block(
     client: &HttpClient,
     height: BlockHeight,
 ) -> anyhow::Result<block::Response> {
-    client
-        .block(height)
-        .await
-        .context("Failed to query CometBFT's last committed height")
+    Ok(serde_json::from_reader(std::fs::File::open("result-block.json")?)?)
 }
 
 async fn query_raw_block_results_at_height(
     client: &HttpClient,
     height: BlockHeight,
 ) -> anyhow::Result<block_results::Response> {
-    client
-        .block_results(height)
-        .await
-        .context("Failed to query CometBFT's block results")
+    Ok(serde_json::from_reader(std::fs::File::open("result-block_results.json")?)?)
 }

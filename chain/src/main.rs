@@ -58,6 +58,8 @@ async fn main() -> Result<(), MainError> {
 
     let (last_block_height, commitment_tree, witness_map) =
         load_committed_state(&app_state, starting_block_height).await?;
+    //let (last_block_height, commitment_tree, witness_map) =
+    //    (None, CommitmentTree::default(), WitnessMap::default());
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
@@ -97,7 +99,9 @@ async fn main() -> Result<(), MainError> {
             },
             |_: &MainError| !must_exit(&exit_handle),
         )
-        .await
+        .await;
+
+        break;
     }
 
     Ok(())
@@ -265,6 +269,8 @@ async fn build_and_commit_masp_data_at_height(
         lookup_valid_commitment_tree(&*client, &commitment_tree, &block_data)
             .await?;
 
+    tracing::warn!(?ordered_txs, "AAAJLKASJDLJSDJLSAD");
+
     let anything_to_commit = !ordered_txs.is_empty();
 
     commitment_tree.rollback();
@@ -348,6 +354,8 @@ where
     // Guess the set of fee unshieldings at the current height
     let fee_unshield_sets = all_indexed_txs.iter().copied().powerset();
 
+    let mut cont = true;
+
     for fee_unshield_set in fee_unshield_sets {
         // Start a new attempt at guessing the root of
         // the commitment tree
@@ -359,6 +367,16 @@ where
             ?fee_unshield_set,
             "Checking subset of masp fee unshields to build cmt tree"
         );
+
+        if fee_unshield_set.len() == 0 {
+            continue;
+        }
+
+        if fee_unshield_set.len() == 1 && cont {
+            tracing::warn!(?fee_unshield_set, "CONTINUE");
+            cont = false;
+            continue;
+        }
 
         for indexed_tx in fee_unshield_set {
             let masp_tx = block.get_masp_tx(indexed_tx).unwrap();
