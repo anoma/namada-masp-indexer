@@ -262,7 +262,7 @@ async fn build_and_commit_masp_data_at_height(
     let mut tx_notes_index = TxNoteMap::default();
 
     let ordered_txs =
-        lookup_valid_commitment_tree(&client, &commitment_tree, &block_data)
+        lookup_valid_commitment_tree(&*client, &commitment_tree, &block_data)
             .await?;
 
     let anything_to_commit = !ordered_txs.is_empty();
@@ -330,11 +330,14 @@ async fn build_and_commit_masp_data_at_height(
     Ok(())
 }
 
-async fn lookup_valid_commitment_tree(
-    client: &HttpClient,
+async fn lookup_valid_commitment_tree<V>(
+    verifier: &V,
     commitment_tree: &CommitmentTree,
     block: &Block,
-) -> Result<Vec<IndexedTx>, MainError> {
+) -> Result<Vec<IndexedTx>, MainError>
+where
+    V: VerifyCommitmentTreeExistence,
+{
     use itertools::Itertools;
 
     let all_indexed_txs: Vec<_> = block.indexed_txs().collect();
@@ -381,12 +384,10 @@ async fn lookup_valid_commitment_tree(
             correct_order.push(indexed_tx);
         }
 
-        if cometbft_service::query_commitment_tree_anchor_existence(
-            client,
-            commitment_tree.root(),
-        )
-        .await
-        .into_masp_error()?
+        if verifier
+            .verify_commitment_tree_existence(commitment_tree)
+            .await
+            .into_masp_error()?
         {
             return Ok(correct_order);
         }
@@ -396,4 +397,24 @@ async fn lookup_valid_commitment_tree(
         "Couldn't find a valid permutation of fee unshieldings"
     ))
     .into_masp_error()
+}
+
+trait VerifyCommitmentTreeExistence {
+    async fn verify_commitment_tree_existence(
+        &self,
+        commitment_tree: &CommitmentTree,
+    ) -> anyhow::Result<bool>;
+}
+
+impl VerifyCommitmentTreeExistence for HttpClient {
+    async fn verify_commitment_tree_existence(
+        &self,
+        commitment_tree: &CommitmentTree,
+    ) -> anyhow::Result<bool> {
+        cometbft_service::query_commitment_tree_anchor_existence(
+            self,
+            commitment_tree.root(),
+        )
+        .await
+    }
 }
