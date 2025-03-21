@@ -28,6 +28,10 @@ impl InnerCommitmentTree {
         }
     }
 
+    fn is_dirty(&self) -> bool {
+        self.transactional.is_dirty()
+    }
+
     fn rollback(&mut self) {
         self.transactional.rollback();
     }
@@ -38,6 +42,10 @@ impl InnerCommitmentTree {
 
     fn size(&self) -> usize {
         self.transactional.as_ref().size()
+    }
+
+    fn root(&self) -> Node {
+        self.transactional.as_ref().root()
     }
 
     fn get_tree(&self) -> MaspCommitmentTree<Node> {
@@ -64,12 +72,20 @@ impl CommitmentTree {
         Self(Arc::new(Mutex::new(InnerCommitmentTree::new(tree))))
     }
 
+    pub fn is_dirty(&self) -> bool {
+        self.0.lock().unwrap().is_dirty()
+    }
+
     pub fn rollback(&self) {
         self.0.lock().unwrap().rollback()
     }
 
     pub fn size(&self) -> usize {
         self.0.lock().unwrap().size()
+    }
+
+    pub fn root(&self) -> Node {
+        self.0.lock().unwrap().root()
     }
 
     pub fn append(&self, node: Node) -> bool {

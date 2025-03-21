@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-use namada_sdk::events::extend::IndexedMaspData;
+use namada_sdk::state::TxIndex as NamadaTxIndex;
+use namada_tx::Tx as NamadaTx;
+use namada_tx::event::MaspEvent;
 use tendermint_rpc::endpoint::{block, block_results};
 
 use crate::block_results::locate_masp_txs;
@@ -12,7 +14,7 @@ use crate::transaction::Transaction;
 pub struct Block {
     pub hash: Id,
     pub header: BlockHeader,
-    pub transactions: Vec<(usize, Transaction)>,
+    pub transactions: Vec<Transaction>,
 }
 
 impl Block {
@@ -20,7 +22,7 @@ impl Block {
         raw_block: block::Response,
         raw_results: block_results::Response,
     ) -> Result<Self, String> {
-        let indexed_masp_txs = locate_masp_txs(&raw_results);
+        let indexed_masp_txs = locate_masp_txs(&raw_results)?;
 
         let mut block = Block {
             hash: Id::from(raw_block.block_id.hash),
@@ -28,16 +30,39 @@ impl Block {
             transactions: Vec::with_capacity(raw_block.block.data.len()),
         };
 
-        for IndexedMaspData {
+        // Cache the last tx seen to avoid multiple deserializations
+        let mut last_tx: Option<(NamadaTx, NamadaTxIndex)> = None;
+
+        for MaspEvent {
             tx_index,
-            masp_refs,
+            kind,
+            data,
         } in indexed_masp_txs
         {
-            let block_index = tx_index.0 as usize;
-            let tx_bytes = &raw_block.block.data[block_index];
-            let tx = Transaction::from_namada_tx(tx_bytes, &masp_refs.0)?;
+            let tx = match &last_tx {
+                Some((tx, idx)) if idx == &tx_index.block_index => tx,
+                _ => {
+                    let tx = NamadaTx::try_from_bytes(
+                        raw_block.block.data[tx_index.block_index.0 as usize]
+                            .as_ref(),
+                    )
+                    .map_err(|e| e.to_string())?;
+                    last_tx = Some((tx, tx_index.block_index));
 
-            block.transactions.push((block_index, tx));
+                    &last_tx.as_ref().unwrap().0
+                }
+            };
+
+            let tx = Transaction::from_namada_tx(
+                tx,
+                crate::indexed_tx::MaspIndexedTx {
+                    kind: kind.into(),
+                    indexed_tx: tx_index.into(),
+                },
+                &data,
+            )?;
+
+            block.transactions.push(tx);
         }
 
         Ok(block)
@@ -53,7 +78,7 @@ impl Display for Block {
             self.header.height,
             self.transactions
                 .iter()
-                .map(|(_, tx)| tx.to_string())
+                .map(|tx| tx.to_string())
                 .collect::<Vec<String>>()
         )
     }

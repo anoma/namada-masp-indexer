@@ -13,6 +13,12 @@ pub struct AppConfig {
     #[clap(long, env)]
     pub interval: Option<u64>,
 
+    #[clap(long, env)]
+    pub starting_block_height: Option<u64>,
+
+    #[clap(long, env, default_value_t = 0)]
+    pub number_of_witness_map_roots_to_check: usize,
+
     #[command(flatten)]
     pub verbosity: Verbosity<InfoLevel>,
 }

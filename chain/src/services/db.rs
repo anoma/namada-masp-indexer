@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use deadpool_diesel::postgres::Object;
 use diesel::connection::DefaultLoadingMode as DbDefaultLoadingMode;
 use diesel::dsl::max;
@@ -9,7 +9,7 @@ use diesel::{
     RunQueryDsl, SelectableHelper,
 };
 use diesel_migrations::{
-    embed_migrations, EmbeddedMigrations, MigrationHarness,
+    EmbeddedMigrations, MigrationHarness, embed_migrations,
 };
 use namada_sdk::borsh::{BorshDeserialize, BorshSerializeExt};
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
@@ -21,12 +21,14 @@ use orm::tx::TxInsertDb;
 use orm::witness::WitnessDb;
 use shared::error::ContextDbInteractError;
 use shared::height::BlockHeight;
-use shared::indexed_tx::IndexedTx;
+use shared::indexed_tx::MaspIndexedTx;
+use tokio::time::Instant;
 
 use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
+use crate::with_time_taken;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../orm/migrations/");
 
@@ -177,12 +179,13 @@ pub async fn get_last_witness_map(conn: Object) -> anyhow::Result<WitnessMap> {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn commit(
+    checkpoint: &mut Instant,
     conn: &Object,
     chain_state: ChainState,
     commitment_tree: CommitmentTree,
     witness_map: WitnessMap,
     notes_index: TxNoteMap,
-    shielded_txs: BTreeMap<IndexedTx, Transaction>,
+    shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     tracing::info!(
         block_height = %chain_state.block_height,
@@ -260,11 +263,20 @@ pub async fn commit(
 
                     let shielded_txs_db = shielded_txs
                         .iter()
-                        .map(|(index, tx)| TxInsertDb {
-                            block_index: index.block_index.0 as i32,
-                            tx_bytes: tx.serialize_to_vec(),
-                            block_height: index.block_height.0 as i32,
-                            masp_tx_index: index.masp_tx_index.0 as i32,
+                        .map(|(MaspIndexedTx { kind, indexed_tx }, tx)| {
+                            let is_masp_fee_payment = matches!(
+                                kind,
+                                shared::indexed_tx::MaspTxKind::FeePayment
+                            );
+
+                            TxInsertDb {
+                                block_index: indexed_tx.block_index.0 as i32,
+                                tx_bytes: tx.serialize_to_vec(),
+                                block_height: indexed_tx.block_height.0 as i32,
+                                masp_tx_index: indexed_tx.masp_tx_index.0
+                                    as i32,
+                                is_masp_fee_payment,
+                            }
                         })
                         .collect::<Vec<TxInsertDb>>();
                     diesel::insert_into(schema::tx::table)
@@ -308,10 +320,13 @@ pub async fn commit(
         )
     })?;
 
-    tracing::info!(
-        block_height = %chain_state.block_height,
-        "Committed new block"
-    );
+    with_time_taken(checkpoint, |time_taken| {
+        tracing::info!(
+            block_height = %chain_state.block_height,
+            time_taken,
+            "Committed new block"
+        );
+    });
 
     Ok(())
 }

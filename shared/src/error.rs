@@ -49,6 +49,11 @@ pub trait IntoMainError<T>: Sized {
     fn into_masp_error(self) -> Result<T, MainError> {
         self.into_main_error("MASP error")
     }
+
+    #[inline]
+    fn into_tokio_join_error(self) -> Result<T, MainError> {
+        self.into_main_error("Tokio join error")
+    }
 }
 
 impl<T> IntoMainError<T> for anyhow::Result<T> {

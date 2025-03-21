@@ -29,6 +29,7 @@ diesel::table! {
         block_index -> Int4,
         block_height -> Int4,
         masp_tx_index -> Int4,
+        is_masp_fee_payment -> Bool,
     }
 }
 
@@ -39,6 +40,7 @@ diesel::table! {
         tx_bytes -> Bytea,
         block_height -> Int4,
         masp_tx_index -> Int4,
+        is_masp_fee_payment -> Bool,
     }
 }
 
