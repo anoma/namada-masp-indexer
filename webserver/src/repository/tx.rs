@@ -62,6 +62,11 @@ impl TxRepositoryTrait for TxRepository {
                             .ge(from_block_height)
                             .and(tx::dsl::block_height.le(to_block_height)),
                     )
+                    .order_by((
+                        tx::dsl::block_height.asc(),
+                        tx::dsl::block_index.asc(),
+                        tx::dsl::masp_tx_index.asc(),
+                    ))
                     .select(TxDb::as_select())
                     .get_results(conn)
                     .with_context(|| {
