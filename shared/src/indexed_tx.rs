@@ -58,8 +58,8 @@ pub struct IndexedTx {
 impl From<namada_tx::IndexedTx> for IndexedTx {
     fn from(value: namada_tx::IndexedTx) -> Self {
         Self {
-            block_height: value.height.0.into(),
-            block_index: TxIndex(value.index.0),
+            block_height: value.block_height.0.into(),
+            block_index: TxIndex(value.block_index.0),
             masp_tx_index: MaspTxIndex(value.batch_index.unwrap() as usize),
         }
     }
