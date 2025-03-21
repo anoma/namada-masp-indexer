@@ -40,14 +40,14 @@ impl Block {
         } in indexed_masp_txs
         {
             let tx = match &last_tx {
-                Some((tx, idx)) if idx == &tx_index.index => tx,
+                Some((tx, idx)) if idx == &tx_index.block_index => tx,
                 _ => {
                     let tx = NamadaTx::try_from_bytes(
-                        raw_block.block.data[tx_index.index.0 as usize]
+                        raw_block.block.data[tx_index.block_index.0 as usize]
                             .as_ref(),
                     )
                     .map_err(|e| e.to_string())?;
-                    last_tx = Some((tx, tx_index.index));
+                    last_tx = Some((tx, tx_index.block_index));
 
                     &last_tx.as_ref().unwrap().0
                 }
