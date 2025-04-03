@@ -15,6 +15,8 @@ pub fn update_witness_map(
     indexed_tx: MaspIndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> anyhow::Result<()> {
+    tracing::info!(?indexed_tx, "Updating witness map");
+
     let mut note_pos = commitment_tree.size();
     tx_notes_index.insert(indexed_tx, note_pos);
 

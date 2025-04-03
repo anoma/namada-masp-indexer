@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::Display;
 
 use namada_sdk::state::TxIndex as NamadaTxIndex;
@@ -8,13 +9,14 @@ use tendermint_rpc::endpoint::{block, block_results};
 use crate::block_results::locate_masp_txs;
 use crate::header::BlockHeader;
 use crate::id::Id;
+use crate::indexed_tx::MaspIndexedTx;
 use crate::transaction::Transaction;
 
 #[derive(Debug, Clone, Default)]
 pub struct Block {
     pub hash: Id,
     pub header: BlockHeader,
-    pub transactions: Vec<Transaction>,
+    pub transactions: BTreeMap<MaspIndexedTx, Transaction>,
 }
 
 impl Block {
@@ -27,7 +29,7 @@ impl Block {
         let mut block = Block {
             hash: Id::from(raw_block.block_id.hash),
             header: BlockHeader::from(raw_block.block.header),
-            transactions: Vec::with_capacity(raw_block.block.data.len()),
+            transactions: BTreeMap::new(),
         };
 
         // Cache the last tx seen to avoid multiple deserializations
@@ -53,16 +55,15 @@ impl Block {
                 }
             };
 
-            let tx = Transaction::from_namada_tx(
-                tx,
-                crate::indexed_tx::MaspIndexedTx {
+            let tx = Transaction::from_namada_tx(tx, &data)?;
+
+            block.transactions.insert(
+                MaspIndexedTx {
                     kind: kind.into(),
                     indexed_tx: tx_index.into(),
                 },
-                &data,
-            )?;
-
-            block.transactions.push(tx);
+                tx,
+            );
         }
 
         Ok(block)
@@ -78,7 +79,12 @@ impl Display for Block {
             self.header.height,
             self.transactions
                 .iter()
-                .map(|tx| tx.to_string())
+                .map(|(masp_indexed_tx, tx)| {
+                    format!(
+                        "Hash: {}, Batch index: {}",
+                        tx.hash, masp_indexed_tx.indexed_tx.masp_tx_index
+                    )
+                })
                 .collect::<Vec<String>>()
         )
     }
