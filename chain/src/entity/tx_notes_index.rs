@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
 use orm::notes_index::NotesIndexInsertDb;
-use shared::indexed_tx::IndexedTx;
+use shared::indexed_tx::{IndexedTx, MaspIndexedTx};
 
 #[derive(Default, Clone, Debug)]
-pub struct TxNoteMap(BTreeMap<IndexedTx, usize>);
+pub struct TxNoteMap(BTreeMap<MaspIndexedTx, usize>);
 
 impl TxNoteMap {
-    pub fn insert(&mut self, indexed_tx: IndexedTx, note_pos: usize) {
+    pub fn insert(&mut self, indexed_tx: MaspIndexedTx, note_pos: usize) {
         self.0.insert(indexed_tx, note_pos);
     }
 
@@ -20,10 +20,14 @@ impl TxNoteMap {
             .iter()
             .map(
                 |(
-                    &IndexedTx {
-                        block_height,
-                        block_index,
-                        masp_tx_index,
+                    &MaspIndexedTx {
+                        indexed_tx:
+                            IndexedTx {
+                                block_height,
+                                block_index,
+                                masp_tx_index,
+                            },
+                        kind,
                     },
                     &note_pos,
                 )| NotesIndexInsertDb {
@@ -31,6 +35,10 @@ impl TxNoteMap {
                     note_position: note_pos as i32,
                     block_height: block_height.0 as i32,
                     masp_tx_index: masp_tx_index.0 as i32,
+                    is_masp_fee_payment: matches!(
+                        kind,
+                        shared::indexed_tx::MaspTxKind::FeePayment
+                    ),
                 },
             )
             .collect()

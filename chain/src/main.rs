@@ -5,23 +5,21 @@ pub mod services;
 
 use std::collections::BTreeMap;
 use std::env;
-use std::sync::atomic::{self, AtomicBool};
 use std::sync::Arc;
+use std::sync::atomic::{self, AtomicBool};
 use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
-use shared::indexed_tx::IndexedTx;
 use shared::transaction::Transaction;
-use shared::tx_index::{MaspTxIndex, TxIndex};
-use tendermint_rpc::client::CompatMode;
 use tendermint_rpc::HttpClient;
+use tendermint_rpc::client::CompatMode;
 use tokio::signal;
-use tokio::time::sleep;
-use tokio_retry::strategy::{jitter, FixedInterval};
+use tokio::time::{Instant, sleep};
 use tokio_retry::RetryIf;
+use tokio_retry::strategy::{FixedInterval, jitter};
 
 use crate::appstate::AppState;
 use crate::config::AppConfig;
@@ -29,9 +27,9 @@ use crate::entity::chain_state::ChainState;
 use crate::entity::commitment_tree::CommitmentTree;
 use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
-use crate::services::masp::update_witness_map;
 use crate::services::{
-    cometbft as cometbft_service, db as db_service, rpc as rpc_service,
+    cometbft as cometbft_service, db as db_service, masp as masp_service,
+    rpc as rpc_service,
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
@@ -44,6 +42,8 @@ async fn main() -> Result<(), MainError> {
         database_url,
         interval,
         verbosity,
+        starting_block_height,
+        number_of_witness_map_roots_to_check,
     } = AppConfig::parse();
 
     config::install_tracing_subscriber(verbosity);
@@ -56,7 +56,7 @@ async fn main() -> Result<(), MainError> {
     run_migrations(&app_state).await?;
 
     let (last_block_height, commitment_tree, witness_map) =
-        load_committed_state(&app_state).await?;
+        load_committed_state(&app_state, starting_block_height).await?;
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
@@ -91,6 +91,7 @@ async fn main() -> Result<(), MainError> {
                     commitment_tree,
                     app_state,
                     chain_state,
+                    number_of_witness_map_roots_to_check,
                 )
             },
             |_: &MainError| !must_exit(&exit_handle),
@@ -156,6 +157,7 @@ async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
 
 async fn load_committed_state(
     app_state: &AppState,
+    starting_block_height: Option<u64>,
 ) -> Result<(Option<BlockHeight>, CommitmentTree, WitnessMap), MainError> {
     tracing::info!("Loading last committed state from db...");
 
@@ -164,6 +166,11 @@ async fn load_committed_state(
     )
     .await
     .into_db_error()?;
+
+    let last_block_height = std::cmp::max(
+        last_block_height,
+        starting_block_height.map(BlockHeight::from),
+    );
 
     let commitment_tree = db_service::get_last_commitment_tree(
         app_state.get_db_connection().await.into_db_error()?,
@@ -195,6 +202,7 @@ async fn load_committed_state(
     shared::error::ok((last_block_height, commitment_tree, witness_map))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_and_commit_masp_data_at_height(
     block_height: BlockHeight,
     exit_handle: &AtomicBool,
@@ -203,6 +211,7 @@ async fn build_and_commit_masp_data_at_height(
     commitment_tree: CommitmentTree,
     app_state: AppState,
     chain_state: ChainState,
+    number_of_witness_map_roots_to_check: usize,
 ) -> Result<(), MainError> {
     if must_exit(exit_handle) {
         return Ok(());
@@ -230,7 +239,9 @@ async fn build_and_commit_masp_data_at_height(
         return Err(MainError);
     }
 
-    let block_data = {
+    let mut checkpoint = Instant::now();
+
+    let (block_data, num_transactions) = {
         tracing::info!(
             %block_height,
             "Fetching block data from CometBFT"
@@ -239,11 +250,15 @@ async fn build_and_commit_masp_data_at_height(
             cometbft_service::query_masp_txs_in_block(&client, block_height)
                 .await
                 .into_rpc_error()?;
-        tracing::info!(
-            %block_height,
-            "Acquired block data from CometBFT"
-        );
-        block_data
+        with_time_taken(&mut checkpoint, |time_taken| {
+            tracing::info!(
+                time_taken,
+                %block_height,
+                "Acquired block data from CometBFT"
+            );
+        });
+        let num_transactions = block_data.transactions.len();
+        (block_data, num_transactions)
     };
 
     let mut shielded_txs = BTreeMap::new();
@@ -251,34 +266,45 @@ async fn build_and_commit_masp_data_at_height(
 
     tracing::info!(
         %block_height,
-        num_transactions = block_data.transactions.len(),
+        num_transactions,
         "Processing new masp transactions...",
     );
 
-    for (idx, Transaction { masp_txs, .. }) in
+    for (masp_indexed_tx, Transaction { masp_tx, .. }) in
         block_data.transactions.into_iter()
     {
-        for (masp_tx_index, masp_tx) in masp_txs.into_iter().enumerate() {
-            let indexed_tx = IndexedTx {
-                block_height,
-                block_index: TxIndex(idx as u32),
-                masp_tx_index: MaspTxIndex(masp_tx_index),
-            };
+        masp_service::update_witness_map(
+            &commitment_tree,
+            &mut tx_notes_index,
+            &witness_map,
+            masp_indexed_tx,
+            &masp_tx,
+        )
+        .into_masp_error()?;
 
-            update_witness_map(
-                &commitment_tree,
-                &mut tx_notes_index,
-                &witness_map,
-                indexed_tx,
-                &masp_tx,
-            )
-            .into_masp_error()?;
-
-            shielded_txs.insert(indexed_tx, masp_tx);
-        }
+        shielded_txs.insert(masp_indexed_tx, masp_tx);
     }
 
+    with_time_taken(&mut checkpoint, |time_taken| {
+        tracing::info!(
+            %block_height,
+            num_transactions,
+            time_taken,
+            "Processed new masp transactions",
+        );
+    });
+
+    validate_masp_state(
+        &mut checkpoint,
+        &client,
+        &commitment_tree,
+        &witness_map,
+        number_of_witness_map_roots_to_check,
+    )
+    .await?;
+
     db_service::commit(
+        &mut checkpoint,
         &conn_obj,
         chain_state,
         commitment_tree,
@@ -290,4 +316,59 @@ async fn build_and_commit_masp_data_at_height(
     .into_db_error()?;
 
     Ok(())
+}
+
+async fn validate_masp_state(
+    checkpoint: &mut Instant,
+    client: &HttpClient,
+    commitment_tree: &CommitmentTree,
+    witness_map: &WitnessMap,
+    number_of_witness_map_roots_to_check: usize,
+) -> Result<(), MainError> {
+    if commitment_tree.is_dirty() && number_of_witness_map_roots_to_check > 0 {
+        tracing::info!("Validating MASP state...");
+
+        let tree_root = tokio::task::block_in_place(|| commitment_tree.root());
+
+        let commitment_tree_check_fut = async {
+            cometbft_service::query_commitment_tree_anchor_existence(
+                client, tree_root,
+            )
+            .await
+            .into_rpc_error()
+        };
+
+        let witness_map = witness_map.clone();
+        let witness_map_check_fut = async move {
+            tokio::task::spawn_blocking(move || {
+                masp_service::query_witness_map_anchor_existence(
+                    &witness_map,
+                    tree_root,
+                    number_of_witness_map_roots_to_check,
+                )
+                .into_masp_error()
+            })
+            .await
+            .context("Failed to join Tokio task")
+            .into_tokio_join_error()?
+        };
+
+        futures::try_join!(commitment_tree_check_fut, witness_map_check_fut)?;
+
+        with_time_taken(checkpoint, |time_taken| {
+            tracing::info!(time_taken, "Validated MASP state");
+        });
+    }
+
+    Ok(())
+}
+
+fn with_time_taken<F, T>(checkpoint: &mut Instant, callback: F) -> T
+where
+    F: FnOnce(f64) -> T,
+{
+    let last_checkpoint = std::mem::replace(checkpoint, Instant::now());
+    let time_taken = last_checkpoint.elapsed().as_secs_f64();
+
+    callback(time_taken)
 }
