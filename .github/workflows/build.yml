@@ -72,24 +72,6 @@ jobs:
           cache: true
       - run: just fmt check
 
-  build:
-    if: ${{ github.event_name == 'pull_request' }}
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@just
-      - uses: rui314/setup-mold@v1
-      - name: Install protobuf
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: true
-      - run: just build
-
   docker:
     name: Docker
     runs-on: ubuntu-latest
@@ -137,7 +119,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.docker.context }}/Dockerfile
-          push: ${{ github.event.pull_request.head.repo.full_name == 'anoma/namada-masp-indexer' || github.event_name == 'push'  }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.docker.cache_scope }}
