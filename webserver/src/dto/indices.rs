@@ -74,7 +74,7 @@ impl TryFrom<RawQuery> for IndexQueryParams {
             .map(|s| {
                 s.parse::<u32>().map_err(|_| {
                     TxError::RawQuery(format!(
-                        "Could not parse {s} as block height"
+                        "Could not parse {s} as block index"
                     ))
                 })
             })
@@ -85,16 +85,21 @@ impl TryFrom<RawQuery> for IndexQueryParams {
                     .to_string(),
             ))
         } else {
-            Ok(Self {
+            let parsed = Self {
                 indices: heights
                     .into_iter()
                     .zip(block_indices)
-                    .map(|(h, ix)| Index {
-                        height: h,
-                        block_index: ix,
+                    .map(|(h, ix)| {
+                        let ix = Index {
+                            height: h,
+                            block_index: ix,
+                        };
+                        ix.validate().map_err(TxError::Validation).map(|_| ix)
                     })
-                    .collect(),
-            })
+                    .collect::<Result<Vec<_>, _>>()?,
+            };
+            parsed.validate().map_err(TxError::Validation)?;
+            Ok(parsed)
         }
     }
 }
