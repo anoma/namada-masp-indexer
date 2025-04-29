@@ -4,6 +4,7 @@ use axum_macros::debug_handler;
 use axum_trace_id::TraceId;
 use shared::error::InspectWrap;
 
+use crate::dto::indices::IndexQueryParams;
 use crate::dto::txs::TxQueryParams;
 use crate::error::tx::TxError;
 use crate::response::tx::TxResponse;
@@ -24,5 +25,21 @@ pub async fn get_tx(
         .await
         .inspect_wrap("get_tx", |err| TxError::Database(err.to_string()))?;
 
+    Ok(Json(TxResponse::new(txs)))
+}
+
+#[debug_handler]
+pub async fn get_tx_by_indices(
+    _trace_id: TraceId<String>,
+    State(state): State<CommonState>,
+    Query(query_params): Query<IndexQueryParams>,
+) -> Result<Json<TxResponse>, TxError> {
+    let txs = state
+        .tx_service
+        .get_txs_by_indices(query_params.indices)
+        .await
+        .inspect_wrap("get_txs_by_indices", |err| {
+            TxError::Database(err.to_string())
+        })?;
     Ok(Json(TxResponse::new(txs)))
 }
