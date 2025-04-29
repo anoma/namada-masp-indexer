@@ -1,5 +1,5 @@
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Query, RawQuery, State};
 use axum_macros::debug_handler;
 use axum_trace_id::TraceId;
 use shared::error::InspectWrap;
@@ -32,8 +32,9 @@ pub async fn get_tx(
 pub async fn get_tx_by_indices(
     _trace_id: TraceId<String>,
     State(state): State<CommonState>,
-    Query(query_params): Query<IndexQueryParams>,
+    raw_query: RawQuery,
 ) -> Result<Json<TxResponse>, TxError> {
+    let query_params = IndexQueryParams::try_from(raw_query)?;
     let txs = state
         .tx_service
         .get_txs_by_indices(query_params.indices)
