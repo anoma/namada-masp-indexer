@@ -11,7 +11,7 @@ pub enum TxError {
     #[error("Error parsing API query: {0}")]
     RawQuery(String),
     #[error("Failed to validate API query: {0}")]
-    Validation(validator::ValidationErrors),
+    Validation(String),
 }
 
 impl IntoResponse for TxError {

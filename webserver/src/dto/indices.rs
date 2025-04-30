@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use axum::extract::RawQuery;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -6,7 +8,7 @@ use crate::error::tx::TxError;
 
 #[derive(Clone, Serialize, Deserialize, Validate)]
 pub struct IndexQueryParams {
-    #[validate(length(min = 1, max = 30))]
+    #[validate(length(min = 1))]
     pub indices: Vec<Index>,
 }
 
@@ -27,38 +29,15 @@ impl TryFrom<RawQuery> for IndexQueryParams {
                 "Received empty indices".to_string(),
             ));
         };
-
-        let mut parts = query.split('&');
-        let heights = parts
-            .next()
-            .ok_or_else(|| {
-                TxError::RawQuery(
-                    "Indices argument requires heights and block_indices \
-                     separated by an '&'"
-                        .to_string(),
-                )
-            })?
-            .strip_prefix("heights=")
-            .ok_or_else(|| {
-                TxError::RawQuery(
-                    "Expected argument name `heights=`".to_string(),
-                )
-            })?;
-        let block_indices = parts
-            .next()
-            .ok_or_else(|| {
-                TxError::RawQuery(
-                    "Indices argument requires heights and block_indices \
-                     separated by an '&'"
-                        .to_string(),
-                )
-            })?
-            .strip_prefix("block_indices=")
-            .ok_or_else(|| {
-                TxError::RawQuery(
-                    "Expected argument name `block_indices=`".to_string(),
-                )
-            })?;
+        let args = ArgParser::parse(&query).map_err(TxError::RawQuery)?;
+        let heights = args.0.get("heights").ok_or_else(|| {
+            TxError::RawQuery("Expected argument name `heights`".to_string())
+        })?;
+        let block_indices = args.0.get("block_indices").ok_or_else(|| {
+            TxError::RawQuery(
+                "Expected argument name `block_indices`".to_string(),
+            )
+        })?;
         let heights = heights
             .split('.')
             .map(|s| {
@@ -85,6 +64,7 @@ impl TryFrom<RawQuery> for IndexQueryParams {
                     .to_string(),
             ))
         } else {
+            let mut distinct_heights = HashSet::new();
             let parsed = Self {
                 indices: heights
                     .into_iter()
@@ -94,12 +74,48 @@ impl TryFrom<RawQuery> for IndexQueryParams {
                             height: h,
                             block_index: ix,
                         };
-                        ix.validate().map_err(TxError::Validation).map(|_| ix)
+                        distinct_heights.insert(h);
+                        ix.validate()
+                            .map_err(|e| TxError::Validation(e.to_string()))
+                            .map(|_| ix)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             };
-            parsed.validate().map_err(TxError::Validation)?;
-            Ok(parsed)
+            if distinct_heights.len() > 30 {
+                Err(TxError::Validation(
+                    "Cannot request more than 30 unique block heights"
+                        .to_string(),
+                ))
+            } else {
+                parsed
+                    .validate()
+                    .map_err(|e| TxError::Validation(e.to_string()))?;
+                Ok(parsed)
+            }
         }
+    }
+}
+
+#[derive(Default)]
+struct ArgParser<'a>(HashMap<&'a str, &'a str>);
+
+impl<'b> ArgParser<'b> {
+    fn parse<'a>(input: &'a str) -> Result<ArgParser<'b>, String>
+    where
+        'a: 'b,
+    {
+        let mut args = Self::default();
+        for kv_pair in input.split('&') {
+            if let Ok([k, v]) =
+                <[&str; 2]>::try_from(kv_pair.split('=').collect::<Vec<&str>>())
+            {
+                args.0.insert(k, v);
+            } else {
+                return Err("Could not parse one of the arguments with \
+                            expected format key=value"
+                    .to_string());
+            }
+        }
+        Ok(args)
     }
 }
