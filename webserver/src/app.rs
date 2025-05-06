@@ -21,6 +21,7 @@ use crate::appstate::AppState;
 use crate::config::AppConfig;
 use crate::handler;
 use crate::state::common::CommonState;
+use crate::utils::cache_forever;
 
 lazy_static! {
     static ref HTTP_TIMEOUT: u64 = 60;
@@ -42,17 +43,17 @@ impl ApplicationServer {
             Router::new()
                 .route(
                     "/commitment-tree",
-                    get(handler::tree::get_commitment_tree),
+                    get(cache_forever(handler::tree::get_commitment_tree)),
                 )
                 .route(
                     "/witness-map",
-                    get(handler::witness_map::get_witness_map),
+                    get(cache_forever(handler::witness_map::get_witness_map)),
                 )
                 .route(
                     "/notes-index",
-                    get(handler::notes_index::get_notes_index),
+                    get(cache_forever(handler::notes_index::get_notes_index)),
                 )
-                .route("/tx", get(handler::tx::get_tx))
+                .route("/tx", get(cache_forever(handler::tx::get_tx)))
                 .route("/height", get(handler::namada_state::get_latest_height))
                 .route(
                     "/block-index",
