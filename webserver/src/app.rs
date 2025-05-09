@@ -53,6 +53,7 @@ impl ApplicationServer {
                     get(handler::notes_index::get_notes_index),
                 )
                 .route("/tx", get(handler::tx::get_tx))
+                .route("/tx_by_indices", get(handler::tx::get_tx_by_indices))
                 .route("/height", get(handler::namada_state::get_latest_height))
                 .route(
                     "/block-index",
