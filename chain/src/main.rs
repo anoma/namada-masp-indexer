@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
+use namada_sdk::queries::RPC;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
 use shared::transaction::Transaction;
@@ -29,7 +30,6 @@ use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 use crate::services::{
     cometbft as cometbft_service, db as db_service, masp as masp_service,
-    rpc as rpc_service,
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
@@ -69,12 +69,38 @@ async fn main() -> Result<(), MainError> {
         .unwrap_or(DEFAULT_INTERVAL * 1000);
     let retry_strategy = FixedInterval::from_millis(internal).map(jitter);
 
+    let mut latest_known_block_height =
+        last_block_height.unwrap_or(BlockHeight::from(0));
+
     for block_height in FollowingHeights::after(last_block_height) {
         if must_exit(&exit_handle) {
             break;
         }
 
-        _ = RetryIf::spawn(
+        // If the latest known block height is less than the block height:
+        // 1) We need to fetch the latest block height
+        // 2) If the latest block height is less than the block height, we need to wait for the block to be committed
+        if latest_known_block_height.0 < block_height.0 {
+            let new_latest_block_height = RetryIf::spawn(
+                retry_strategy.clone(),
+                || need_to_wait_for_block(client.clone(), block_height),
+                |_: &MainError| !must_exit(&exit_handle),
+            )
+            .await;
+
+            // Update the latest known block height with the result
+            if let Ok(latest_height) = new_latest_block_height {
+                latest_known_block_height = latest_height;
+            }
+
+            tracing::info!(
+                %latest_known_block_height,
+                "Latest known block height"
+            );
+        }
+
+        // Build and commit MASP data at the block height
+        let _ = RetryIf::spawn(
             retry_strategy.clone(),
             || {
                 let client = client.clone();
@@ -96,10 +122,36 @@ async fn main() -> Result<(), MainError> {
             },
             |_: &MainError| !must_exit(&exit_handle),
         )
-        .await
+        .await;
     }
 
     Ok(())
+}
+
+// returns latest block height if sufficiently new.
+// Else returns an error, to signal to caller to retry
+async fn need_to_wait_for_block(
+    client: Arc<HttpClient>,
+    block_height: BlockHeight,
+) -> Result<BlockHeight, MainError> {
+    let latest_known_block_height_option = RPC
+        .shell()
+        .last_block(&*client)
+        .await
+        .context("Failed to query Namada's last committed block")
+        .into_rpc_error()?;
+    match latest_known_block_height_option {
+        Some(b) => {
+            let new_latest_known_block_height: BlockHeight = b.height.into();
+            let need_to_wait = block_height.0 > new_latest_known_block_height.0;
+            if need_to_wait {
+                Err(MainError)
+            } else {
+                Ok(new_latest_known_block_height)
+            }
+        }
+        None => Err(MainError),
+    }
 }
 
 #[inline]
@@ -227,17 +279,6 @@ async fn build_and_commit_masp_data_at_height(
         %block_height,
         "Attempting to process new block"
     );
-
-    if !rpc_service::is_block_committed(&client, &block_height)
-        .await
-        .into_rpc_error()?
-    {
-        tracing::warn!(
-            %block_height,
-            "Block was not processed, retrying..."
-        );
-        return Err(MainError);
-    }
 
     let mut checkpoint = Instant::now();
 
