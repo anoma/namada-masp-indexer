@@ -192,6 +192,36 @@ pub async fn commit(
         "Beginning block commit"
     );
 
+    commit_inner(
+        conn,
+        chain_state,
+        commitment_tree,
+        witness_map,
+        notes_index,
+        shielded_txs,
+    )
+    .await?;
+
+    with_time_taken(checkpoint, |time_taken| {
+        tracing::info!(
+            block_height = %chain_state.block_height,
+            time_taken,
+            "Committed new block"
+        );
+    });
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn commit_inner(
+    conn: &Object,
+    chain_state: ChainState,
+    commitment_tree: CommitmentTree,
+    witness_map: WitnessMap,
+    notes_index: TxNoteMap,
+    shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
+) -> anyhow::Result<()> {
     conn.interact(move |conn| {
         conn.build_transaction()
             .read_write()
@@ -319,14 +349,6 @@ pub async fn commit(
             chain_state.block_height
         )
     })?;
-
-    with_time_taken(checkpoint, |time_taken| {
-        tracing::info!(
-            block_height = %chain_state.block_height,
-            time_taken,
-            "Committed new block"
-        );
-    });
 
     Ok(())
 }
