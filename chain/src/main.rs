@@ -318,7 +318,6 @@ async fn build_and_commit_masp_data_at_height(
         tx_notes_index,
         shielded_txs,
     )
-    .await
     .into_db_error()?;
 
     Ok(())
