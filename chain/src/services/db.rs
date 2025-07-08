@@ -183,7 +183,7 @@ pub fn commit(
     conn: &Object,
     chain_state: ChainState,
     commitment_tree: &mut CommitmentTree,
-    witness_map: WitnessMap,
+    witness_map: &mut WitnessMap,
     notes_index: &mut TxNoteMap,
     shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
@@ -219,7 +219,7 @@ fn commit_inner(
     pool_conn: &Object,
     chain_state: ChainState,
     commitment_tree: &mut CommitmentTree,
-    witness_map: WitnessMap,
+    witness_map: &mut WitnessMap,
     notes_index: &mut TxNoteMap,
     shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {

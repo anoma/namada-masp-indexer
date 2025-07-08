@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 use namada_sdk::borsh::BorshSerializeExt;
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
@@ -9,12 +8,12 @@ use shared::height::BlockHeight;
 use shared::transactional::Transactional;
 
 #[derive(Default, Debug)]
-struct InnerWitnessMap {
+pub struct WitnessMap {
     transactional: Transactional<HashMap<usize, IncrementalWitness<Node>>>,
 }
 
-impl InnerWitnessMap {
-    const fn new(
+impl WitnessMap {
+    pub const fn new(
         witness_map: HashMap<usize, IncrementalWitness<Node>>,
     ) -> Self {
         Self {
@@ -22,7 +21,7 @@ impl InnerWitnessMap {
         }
     }
 
-    fn roots(&self, number_of_roots: usize) -> Vec<(usize, Node)> {
+    pub fn roots(&self, number_of_roots: usize) -> Vec<(usize, Node)> {
         self.transactional
             .as_ref()
             .iter()
@@ -31,27 +30,31 @@ impl InnerWitnessMap {
             .collect()
     }
 
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.transactional.as_ref().len()
     }
 
-    fn rollback(&mut self) {
+    pub fn rollback(&mut self) {
         self.transactional.rollback();
     }
 
-    fn update(&mut self, node: Node) -> Result<(), usize> {
+    pub fn update(&mut self, node: Node) -> Result<(), usize> {
         for (note_pos, witness) in self.transactional.as_mut().iter_mut() {
             witness.append(node).map_err(|()| *note_pos)?;
         }
         Ok(())
     }
 
-    fn insert(&mut self, note_pos: usize, witness: IncrementalWitness<Node>) {
+    pub fn insert(
+        &mut self,
+        note_pos: usize,
+        witness: IncrementalWitness<Node>,
+    ) {
         self.transactional.as_mut().insert(note_pos, witness);
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn into_db(
+    pub fn into_db(
         &mut self,
         block_height: BlockHeight,
     ) -> Option<Vec<WitnessInsertDb>> {
@@ -69,42 +72,5 @@ impl InnerWitnessMap {
                 })
                 .collect(),
         )
-    }
-}
-
-#[derive(Default, Clone, Debug)]
-pub struct WitnessMap(Arc<Mutex<InnerWitnessMap>>);
-
-impl WitnessMap {
-    pub fn new(witness_map: HashMap<usize, IncrementalWitness<Node>>) -> Self {
-        Self(Arc::new(Mutex::new(InnerWitnessMap::new(witness_map))))
-    }
-
-    pub fn roots(&self, number_of_roots: usize) -> Vec<(usize, Node)> {
-        self.0.lock().unwrap().roots(number_of_roots)
-    }
-
-    pub fn size(&self) -> usize {
-        self.0.lock().unwrap().size()
-    }
-
-    pub fn rollback(&self) {
-        self.0.lock().unwrap().rollback()
-    }
-
-    pub fn update(&self, node: Node) -> Result<(), usize> {
-        self.0.lock().unwrap().update(node)
-    }
-
-    pub fn insert(&self, note_pos: usize, witness: IncrementalWitness<Node>) {
-        self.0.lock().unwrap().insert(note_pos, witness)
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    pub fn into_db(
-        &self,
-        block_height: BlockHeight,
-    ) -> Option<Vec<WitnessInsertDb>> {
-        self.0.lock().unwrap().into_db(block_height)
     }
 }
