@@ -54,7 +54,7 @@ async fn main() -> Result<(), MainError> {
 
     run_migrations(&app_state).await?;
 
-    let (last_block_height, commitment_tree, witness_map) =
+    let (last_block_height, mut commitment_tree, witness_map) =
         load_committed_state(&app_state, starting_block_height).await?;
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
@@ -86,7 +86,6 @@ async fn main() -> Result<(), MainError> {
             async || {
                 let client = client.clone();
                 let witness_map = witness_map.clone();
-                let commitment_tree = commitment_tree.clone();
                 let app_state = app_state.clone();
                 let chain_state = ChainState::new(block_height);
 
@@ -95,7 +94,7 @@ async fn main() -> Result<(), MainError> {
                     &exit_handle,
                     client,
                     witness_map,
-                    commitment_tree,
+                    &mut commitment_tree,
                     app_state,
                     chain_state,
                     number_of_witness_map_roots_to_check,
@@ -225,7 +224,7 @@ async fn build_and_commit_masp_data_at_height(
     exit_handle: &AtomicBool,
     client: Arc<HttpClient>,
     witness_map: WitnessMap,
-    commitment_tree: CommitmentTree,
+    commitment_tree: &mut CommitmentTree,
     app_state: AppState,
     chain_state: ChainState,
     number_of_witness_map_roots_to_check: usize,
@@ -280,7 +279,7 @@ async fn build_and_commit_masp_data_at_height(
         block_data.transactions.into_iter()
     {
         masp_service::update_witness_map(
-            &commitment_tree,
+            commitment_tree,
             &mut tx_notes_index,
             &witness_map,
             masp_indexed_tx,
@@ -303,7 +302,7 @@ async fn build_and_commit_masp_data_at_height(
     validate_masp_state(
         &mut checkpoint,
         &client,
-        &commitment_tree,
+        commitment_tree,
         &witness_map,
         number_of_witness_map_roots_to_check,
     )

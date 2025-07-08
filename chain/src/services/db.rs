@@ -182,7 +182,7 @@ pub fn commit(
     checkpoint: &mut Instant,
     conn: &Object,
     chain_state: ChainState,
-    commitment_tree: CommitmentTree,
+    commitment_tree: &mut CommitmentTree,
     witness_map: WitnessMap,
     notes_index: TxNoteMap,
     shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
@@ -218,7 +218,7 @@ pub fn commit(
 fn commit_inner(
     pool_conn: &Object,
     chain_state: ChainState,
-    commitment_tree: CommitmentTree,
+    commitment_tree: &mut CommitmentTree,
     witness_map: WitnessMap,
     notes_index: TxNoteMap,
     shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
