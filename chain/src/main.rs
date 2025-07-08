@@ -57,6 +57,8 @@ async fn main() -> Result<(), MainError> {
     let (last_block_height, mut commitment_tree, witness_map) =
         load_committed_state(&app_state, starting_block_height).await?;
 
+    let mut tx_notes_index = TxNoteMap::default();
+
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
         .build()
@@ -95,6 +97,7 @@ async fn main() -> Result<(), MainError> {
                     client,
                     witness_map,
                     &mut commitment_tree,
+                    &mut tx_notes_index,
                     app_state,
                     chain_state,
                     number_of_witness_map_roots_to_check,
@@ -225,6 +228,7 @@ async fn build_and_commit_masp_data_at_height(
     client: Arc<HttpClient>,
     witness_map: WitnessMap,
     commitment_tree: &mut CommitmentTree,
+    tx_notes_index: &mut TxNoteMap,
     app_state: AppState,
     chain_state: ChainState,
     number_of_witness_map_roots_to_check: usize,
@@ -236,6 +240,7 @@ async fn build_and_commit_masp_data_at_height(
     // NB: rollback changes from previous failed commit attempts
     witness_map.rollback();
     commitment_tree.rollback();
+    tx_notes_index.clear();
 
     let conn_obj = app_state.get_db_connection().await.into_db_error()?;
 
@@ -267,7 +272,6 @@ async fn build_and_commit_masp_data_at_height(
     };
 
     let mut shielded_txs = BTreeMap::new();
-    let mut tx_notes_index = TxNoteMap::default();
 
     tracing::info!(
         %block_height,
@@ -280,7 +284,7 @@ async fn build_and_commit_masp_data_at_height(
     {
         masp_service::update_witness_map(
             commitment_tree,
-            &mut tx_notes_index,
+            tx_notes_index,
             &witness_map,
             masp_indexed_tx,
             &masp_tx,

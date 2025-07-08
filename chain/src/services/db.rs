@@ -184,7 +184,7 @@ pub fn commit(
     chain_state: ChainState,
     commitment_tree: &mut CommitmentTree,
     witness_map: WitnessMap,
-    notes_index: TxNoteMap,
+    notes_index: &mut TxNoteMap,
     shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     tracing::info!(
@@ -220,7 +220,7 @@ fn commit_inner(
     chain_state: ChainState,
     commitment_tree: &mut CommitmentTree,
     witness_map: WitnessMap,
-    notes_index: TxNoteMap,
+    notes_index: &mut TxNoteMap,
     shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     let mut conn = pool_conn
