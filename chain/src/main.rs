@@ -5,22 +5,21 @@ pub mod services;
 
 use std::collections::BTreeMap;
 use std::env;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicBool};
 use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use namada_sdk::queries::RPC;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
+use shared::retry;
 use shared::transaction::Transaction;
 use tendermint_rpc::HttpClient;
 use tendermint_rpc::client::CompatMode;
 use tokio::signal;
 use tokio::time::{Instant, sleep};
-use tokio_retry::RetryIf;
-use tokio_retry::strategy::{FixedInterval, jitter};
 
 use crate::appstate::AppState;
 use crate::config::AppConfig;
@@ -64,45 +63,27 @@ async fn main() -> Result<(), MainError> {
         .unwrap();
     let client = Arc::new(client);
 
-    let internal = interval
-        .map(|millis| millis * 1000)
-        .unwrap_or(DEFAULT_INTERVAL * 1000);
-    let retry_strategy = FixedInterval::from_millis(internal).map(jitter);
+    let retry_interval = Duration::from_millis(
+        interval
+            .map(|millis| millis * 1000)
+            .unwrap_or(DEFAULT_INTERVAL * 1000),
+    );
 
-    let mut latest_known_block_height =
-        last_block_height.unwrap_or(BlockHeight::from(0));
+    let mut heights_to_process = FollowingHeights::after(last_block_height);
 
-    for block_height in FollowingHeights::after(last_block_height) {
+    while let Some(block_height) = heights_to_process
+        .next_height(&client, retry_interval, || must_exit(&exit_handle))
+        .await
+        .into_rpc_error()?
+    {
         if must_exit(&exit_handle) {
             break;
         }
 
-        // If the latest known block height is less than the block height:
-        // 1) We need to fetch the latest block height
-        // 2) If the latest block height is less than the block height, we need to wait for the block to be committed
-        if latest_known_block_height.0 < block_height.0 {
-            let new_latest_block_height = RetryIf::spawn(
-                retry_strategy.clone(),
-                || need_to_wait_for_block(client.clone(), block_height),
-                |_: &MainError| !must_exit(&exit_handle),
-            )
-            .await;
-
-            // Update the latest known block height with the result
-            if let Ok(latest_height) = new_latest_block_height {
-                latest_known_block_height = latest_height;
-            }
-
-            tracing::info!(
-                %latest_known_block_height,
-                "Latest known block height"
-            );
-        }
-
         // Build and commit MASP data at the block height
-        let _ = RetryIf::spawn(
-            retry_strategy.clone(),
-            || {
+        if let ControlFlow::Break(()) = retry::every(
+            retry_interval,
+            async || {
                 let client = client.clone();
                 let witness_map = witness_map.clone();
                 let commitment_tree = commitment_tree.clone();
@@ -119,39 +100,23 @@ async fn main() -> Result<(), MainError> {
                     chain_state,
                     number_of_witness_map_roots_to_check,
                 )
+                .await
             },
-            |_: &MainError| !must_exit(&exit_handle),
+            async |_| {
+                if must_exit(&exit_handle) {
+                    ControlFlow::Break(())
+                } else {
+                    ControlFlow::Continue(())
+                }
+            },
         )
-        .await;
+        .await
+        {
+            break;
+        }
     }
 
     Ok(())
-}
-
-// returns latest block height if sufficiently new.
-// Else returns an error, to signal to caller to retry
-async fn need_to_wait_for_block(
-    client: Arc<HttpClient>,
-    block_height: BlockHeight,
-) -> Result<BlockHeight, MainError> {
-    let latest_known_block_height_option = RPC
-        .shell()
-        .last_block(&*client)
-        .await
-        .context("Failed to query Namada's last committed block")
-        .into_rpc_error()?;
-    match latest_known_block_height_option {
-        Some(b) => {
-            let new_latest_known_block_height: BlockHeight = b.height.into();
-            let need_to_wait = block_height.0 > new_latest_known_block_height.0;
-            if need_to_wait {
-                Err(MainError)
-            } else {
-                Ok(new_latest_known_block_height)
-            }
-        }
-        None => Err(MainError),
-    }
 }
 
 #[inline]
