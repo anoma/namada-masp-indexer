@@ -5,6 +5,7 @@ pub mod services;
 
 use std::collections::BTreeMap;
 use std::env;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicBool};
 use std::time::Duration;
@@ -13,13 +14,12 @@ use anyhow::Context;
 use clap::Parser;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
+use shared::retry;
 use shared::transaction::Transaction;
 use tendermint_rpc::HttpClient;
 use tendermint_rpc::client::CompatMode;
 use tokio::signal;
 use tokio::time::{Instant, sleep};
-use tokio_retry::RetryIf;
-use tokio_retry::strategy::{FixedInterval, jitter};
 
 use crate::appstate::AppState;
 use crate::config::AppConfig;
@@ -29,7 +29,6 @@ use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 use crate::services::{
     cometbft as cometbft_service, db as db_service, masp as masp_service,
-    rpc as rpc_service,
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
@@ -64,19 +63,27 @@ async fn main() -> Result<(), MainError> {
         .unwrap();
     let client = Arc::new(client);
 
-    let internal = interval
-        .map(|millis| millis * 1000)
-        .unwrap_or(DEFAULT_INTERVAL * 1000);
-    let retry_strategy = FixedInterval::from_millis(internal).map(jitter);
+    let retry_interval = Duration::from_millis(
+        interval
+            .map(|millis| millis * 1000)
+            .unwrap_or(DEFAULT_INTERVAL * 1000),
+    );
 
-    for block_height in FollowingHeights::after(last_block_height) {
+    let mut heights_to_process = FollowingHeights::after(last_block_height);
+
+    while let Some(block_height) = heights_to_process
+        .next_height(&client, retry_interval, || must_exit(&exit_handle))
+        .await
+        .into_rpc_error()?
+    {
         if must_exit(&exit_handle) {
             break;
         }
 
-        _ = RetryIf::spawn(
-            retry_strategy.clone(),
-            || {
+        // Build and commit MASP data at the block height
+        if let ControlFlow::Break(()) = retry::every(
+            retry_interval,
+            async || {
                 let client = client.clone();
                 let witness_map = witness_map.clone();
                 let commitment_tree = commitment_tree.clone();
@@ -93,10 +100,20 @@ async fn main() -> Result<(), MainError> {
                     chain_state,
                     number_of_witness_map_roots_to_check,
                 )
+                .await
             },
-            |_: &MainError| !must_exit(&exit_handle),
+            async |_| {
+                if must_exit(&exit_handle) {
+                    ControlFlow::Break(())
+                } else {
+                    ControlFlow::Continue(())
+                }
+            },
         )
         .await
+        {
+            break;
+        }
     }
 
     Ok(())
@@ -227,17 +244,6 @@ async fn build_and_commit_masp_data_at_height(
         %block_height,
         "Attempting to process new block"
     );
-
-    if !rpc_service::is_block_committed(&client, &block_height)
-        .await
-        .into_rpc_error()?
-    {
-        tracing::warn!(
-            %block_height,
-            "Block was not processed, retrying..."
-        );
-        return Err(MainError);
-    }
 
     let mut checkpoint = Instant::now();
 
