@@ -4,6 +4,7 @@ use namada_sdk::borsh::BorshSerializeExt;
 use namada_sdk::masp_primitives::merkle_tree::IncrementalWitness;
 use namada_sdk::masp_primitives::sapling::Node;
 use orm::witness::WitnessInsertDb;
+use rayon::prelude::*;
 use shared::height::BlockHeight;
 use shared::transactional::Transactional;
 
@@ -39,10 +40,13 @@ impl WitnessMap {
     }
 
     pub fn update(&mut self, node: Node) -> Result<(), usize> {
-        for (note_pos, witness) in self.transactional.as_mut().iter_mut() {
-            witness.append(node).map_err(|()| *note_pos)?;
-        }
-        Ok(())
+        self.transactional
+            .as_mut()
+            .iter_mut()
+            .par_bridge()
+            .try_for_each(|(note_pos, witness)| {
+                witness.append(node).map_err(|()| *note_pos)
+            })
     }
 
     pub fn insert(
