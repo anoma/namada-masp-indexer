@@ -185,7 +185,7 @@ pub fn commit(
     commitment_tree: &mut CommitmentTree,
     witness_map: &mut WitnessMap,
     notes_index: &mut TxNoteMap,
-    shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
+    shielded_txs: &mut BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     tracing::info!(
         block_height = %chain_state.block_height,
@@ -221,7 +221,7 @@ fn commit_inner(
     commitment_tree: &mut CommitmentTree,
     witness_map: &mut WitnessMap,
     notes_index: &mut TxNoteMap,
-    shielded_txs: BTreeMap<MaspIndexedTx, Transaction>,
+    shielded_txs: &mut BTreeMap<MaspIndexedTx, Transaction>,
 ) -> anyhow::Result<()> {
     let mut conn = pool_conn
         .lock()
@@ -295,23 +295,31 @@ fn commit_inner(
                     "Pre-committing shielded txs"
                 );
 
-                let shielded_txs_db = shielded_txs
-                    .iter()
-                    .map(|(MaspIndexedTx { kind, indexed_tx }, tx)| {
-                        let is_masp_fee_payment = matches!(
-                            kind,
-                            shared::indexed_tx::MaspTxKind::FeePayment
-                        );
+                let shielded_txs_db = {
+                    let mut rows = Vec::with_capacity(shielded_txs.len());
 
-                        TxInsertDb {
-                            block_index: indexed_tx.block_index.0 as i32,
-                            tx_bytes: tx.serialize_to_vec(),
-                            block_height: indexed_tx.block_height.0 as i32,
-                            masp_tx_index: indexed_tx.masp_tx_index.0 as i32,
-                            is_masp_fee_payment,
-                        }
-                    })
-                    .collect::<Vec<TxInsertDb>>();
+                    while let Some((MaspIndexedTx { kind, indexed_tx }, tx)) =
+                        shielded_txs.pop_first()
+                    {
+                        rows.push({
+                            let is_masp_fee_payment = matches!(
+                                kind,
+                                shared::indexed_tx::MaspTxKind::FeePayment
+                            );
+
+                            TxInsertDb {
+                                block_index: indexed_tx.block_index.0 as i32,
+                                tx_bytes: tx.serialize_to_vec(),
+                                block_height: indexed_tx.block_height.0 as i32,
+                                masp_tx_index: indexed_tx.masp_tx_index.0
+                                    as i32,
+                                is_masp_fee_payment,
+                            }
+                        });
+                    }
+
+                    rows
+                };
                 diesel::insert_into(schema::tx::table)
                     .values(&shielded_txs_db)
                     .on_conflict_do_nothing()

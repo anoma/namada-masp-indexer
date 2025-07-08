@@ -12,8 +12,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
+use namada_sdk::masp_primitives::transaction::Transaction as MaspTransaction;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
+use shared::indexed_tx::MaspIndexedTx;
 use shared::retry;
 use shared::transaction::Transaction;
 use tendermint_rpc::HttpClient;
@@ -58,6 +60,7 @@ async fn main() -> Result<(), MainError> {
         load_committed_state(&app_state, starting_block_height).await?;
 
     let mut tx_notes_index = TxNoteMap::default();
+    let mut shielded_txs = BTreeMap::new();
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
@@ -97,6 +100,7 @@ async fn main() -> Result<(), MainError> {
                     &mut witness_map,
                     &mut commitment_tree,
                     &mut tx_notes_index,
+                    &mut shielded_txs,
                     app_state,
                     chain_state,
                     number_of_witness_map_roots_to_check,
@@ -228,6 +232,7 @@ async fn build_and_commit_masp_data_at_height(
     witness_map: &mut WitnessMap,
     commitment_tree: &mut CommitmentTree,
     tx_notes_index: &mut TxNoteMap,
+    shielded_txs: &mut BTreeMap<MaspIndexedTx, MaspTransaction>,
     app_state: AppState,
     chain_state: ChainState,
     number_of_witness_map_roots_to_check: usize,
@@ -240,6 +245,7 @@ async fn build_and_commit_masp_data_at_height(
     witness_map.rollback();
     commitment_tree.rollback();
     tx_notes_index.clear();
+    shielded_txs.clear();
 
     let conn_obj = app_state.get_db_connection().await.into_db_error()?;
 
@@ -269,8 +275,6 @@ async fn build_and_commit_masp_data_at_height(
         let num_transactions = block_data.transactions.len();
         (block_data, num_transactions)
     };
-
-    let mut shielded_txs = BTreeMap::new();
 
     tracing::info!(
         %block_height,
