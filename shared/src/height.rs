@@ -1,14 +1,58 @@
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::ops::ControlFlow;
 use std::time::Duration;
 
 use anyhow::Context;
 use namada_core::chain::BlockHeight as NamadaBlockHeight;
-use namada_sdk::queries::RPC;
 use tendermint::block::Height;
-use tendermint_rpc::HttpClient;
+use tendermint_rpc::{Client, HttpClient};
 
+use crate::block::Block;
 use crate::retry;
+
+#[derive(Debug)]
+pub struct UnprocessedBlocks {
+    next_height: BlockHeight,
+    buffer: BTreeMap<BlockHeight, Block>,
+}
+
+impl UnprocessedBlocks {
+    pub const fn new(last_committed_height: Option<BlockHeight>) -> Self {
+        Self {
+            next_height: match last_committed_height {
+                Some(BlockHeight(h)) => BlockHeight(h + 1),
+                None => BlockHeight(1),
+            },
+            buffer: BTreeMap::new(),
+        }
+    }
+
+    pub fn next_to_process(&mut self, incoming_block: Block) -> Option<Block> {
+        if self.next_height == incoming_block.header.height {
+            self.increment_next_height();
+            return Some(incoming_block);
+        }
+
+        self.buffer
+            .insert(incoming_block.header.height, incoming_block);
+
+        let can_process_buffer_head =
+            *self.buffer.first_entry()?.key() == self.next_height;
+
+        if can_process_buffer_head {
+            self.increment_next_height();
+            self.buffer.pop_first().map(|(_, block)| block)
+        } else {
+            None
+        }
+    }
+
+    fn increment_next_height(&mut self) {
+        self.next_height =
+            self.next_height.next().expect("Block height overflow");
+    }
+}
 
 pub struct FollowingHeights {
     iter_height: BlockHeight,
@@ -32,46 +76,36 @@ impl FollowingHeights {
         &mut self,
         http_client: &HttpClient,
         fetch_retry_interval: Duration,
-        mut must_exit: impl FnMut() -> bool,
-    ) -> anyhow::Result<Option<BlockHeight>> {
+    ) -> Option<BlockHeight> {
         let next_height =
-            self.iter_height.next().context("Block height overflow")?;
+            self.iter_height.next().expect("Block height overflow");
         self.iter_height = next_height;
 
         // NB: the next height might not have been committed
         // yet, and we must block
         while next_height > self.last_committed_height {
-            let ControlFlow::Continue(block) = retry::every(
-                fetch_retry_interval,
-                async || {
-                    RPC.shell()
-                        .last_block(http_client)
-                        .await
-                        .context(
-                            "Failed to query Namada's last committed block",
-                        )
-                        .and_then(|maybe_block| {
-                            maybe_block
-                                .context("No block has been committed yet")
-                        })
-                },
-                async |_| {
-                    if must_exit() {
-                        ControlFlow::Break(())
-                    } else {
-                        ControlFlow::Continue(())
-                    }
-                },
-            )
-            .await
+            // NB: the compiler likes to complain like a little
+            // bitch if we don't clone the http client
+            let http_client = http_client.clone();
+
+            let ControlFlow::Continue(block) =
+                retry::every(fetch_retry_interval, async move || {
+                    http_client.latest_block().await.context(
+                        "Failed to query Namada's last committed block",
+                    )
+                })
+                .await
             else {
-                return Ok(None);
+                return None;
             };
 
-            self.last_committed_height = block.height.into();
+            self.last_committed_height =
+                BlockHeight(block.block.header.height.value());
         }
 
-        Ok(Some(next_height))
+        debug_assert!(self.iter_height <= self.last_committed_height);
+
+        Some(next_height)
     }
 }
 
