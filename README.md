@@ -1,6 +1,6 @@
 # Namada Masp Indexer
 
-The [`namada-masp-indexer`](https://github.com/anoma/namada-masp-indexer) is a
+The [`namada-masp-indexer`](https://github.com/namada-net/namada-masp-indexer) is a
 specialized indexer that crawls [Namada](https://github.com/anoma/namada)
 networks, extracting [MASP](https://github.com/anoma/masp) transaction data. In
 addition to indexing fetched MASP transactions, the `namada-masp-indexer` builds

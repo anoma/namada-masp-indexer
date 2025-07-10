@@ -78,6 +78,7 @@ jobs:
     env:
       GIT_LFS_SKIP_SMUDGE: 1
       REGISTRY_URL: ghcr.io
+      REPOSITORY: ${{ github.repository }}
 
     strategy:
       fail-fast: true
@@ -98,7 +99,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/anoma/namada-masp-indexer
+          images: ${{ env.REGISTRY_URL }}/${{ env.REPOSITORY }}/namada-masp-indexer
           flavor: |
             latest=auto
             prefix=${{ matrix.docker.image }}
