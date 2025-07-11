@@ -8,6 +8,7 @@ use tendermint_rpc::endpoint::{block, block_results};
 
 use crate::block_results::locate_masp_txs;
 use crate::header::BlockHeader;
+use crate::height::BlockHeight;
 use crate::id::Id;
 use crate::indexed_tx::MaspIndexedTx;
 use crate::transaction::Transaction;
@@ -20,6 +21,12 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn empty_block(block_height: BlockHeight) -> Self {
+        let mut block = Self::default();
+        block.header.height = block_height;
+        block
+    }
+
     pub fn new(
         raw_block: block::Response,
         raw_results: block_results::Response,

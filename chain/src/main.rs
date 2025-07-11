@@ -96,9 +96,20 @@ async fn main() -> Result<(), MainError> {
         // Sort the fetched block
         let Some(block_data) = unprocessed_blocks.next_to_process(block_data)
         else {
-            tracing::debug!(%received_block_height, "Queueing block to be processed");
+            tracing::info!(%received_block_height, "Queueing block to be processed");
             continue;
         };
+
+        // Check if we can skip committing this block for now.
+        // This is because the block is empty. We can make a
+        // single remote procedure call to Postgres, when we
+        // exit.
+        if unprocessed_blocks.pre_commit_check_if_skip(&block_data) {
+            tracing::info!(block_height = %block_data.header.height, "Skipping commit of empty block");
+            continue;
+        }
+
+        tracing::info!(block_height = %block_data.header.height, "Dequeued block to be processed");
 
         // Build and commit MASP data at the block height
         if let ControlFlow::Break(()) =
@@ -119,6 +130,27 @@ async fn main() -> Result<(), MainError> {
         {
             break;
         }
+    }
+
+    if let Some(block_data) = unprocessed_blocks.finalize() {
+        tracing::warn!(
+            block_height = %block_data.header.height,
+            "Single attempt at commiting data to db just before exiting"
+        );
+
+        // Make a feeble attempt at committing before exiting
+        // for good
+        build_and_commit_masp_data_at_height(
+            block_data.clone(),
+            &client,
+            &mut witness_map,
+            &mut commitment_tree,
+            &mut tx_notes_index,
+            &mut shielded_txs,
+            &app_state,
+            number_of_witness_map_roots_to_check,
+        )
+        .await?;
     }
 
     Ok(())

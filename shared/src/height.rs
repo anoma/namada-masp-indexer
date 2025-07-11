@@ -15,6 +15,7 @@ use crate::retry;
 pub struct UnprocessedBlocks {
     next_height: BlockHeight,
     buffer: BTreeMap<BlockHeight, Block>,
+    empty_block_to_commit: Option<BlockHeight>,
 }
 
 impl UnprocessedBlocks {
@@ -25,7 +26,25 @@ impl UnprocessedBlocks {
                 None => BlockHeight(1),
             },
             buffer: BTreeMap::new(),
+            empty_block_to_commit: None,
         }
+    }
+
+    pub fn pre_commit_check_if_skip(
+        &mut self,
+        block_to_commit: &Block,
+    ) -> bool {
+        if block_to_commit.transactions.is_empty() {
+            self.empty_block_to_commit = Some(block_to_commit.header.height);
+            true
+        } else {
+            self.empty_block_to_commit = None;
+            false
+        }
+    }
+
+    pub fn finalize(self) -> Option<Block> {
+        self.empty_block_to_commit.map(Block::empty_block)
     }
 
     pub fn next_to_process(&mut self, incoming_block: Block) -> Option<Block> {
