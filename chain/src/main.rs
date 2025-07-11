@@ -41,7 +41,7 @@ const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
 const DEFAULT_INTERVAL: u64 = 5;
 const DEFAULT_MAX_CONCURRENT_FETCHES: usize = 100;
 
-#[tokio::main(worker_threads = 2)]
+#[tokio::main]
 async fn main() -> Result<(), MainError> {
     let AppConfig {
         cometbft_url,
