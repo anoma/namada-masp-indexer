@@ -12,8 +12,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
+use namada_sdk::masp_primitives::transaction::Transaction as MaspTransaction;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights};
+use shared::indexed_tx::MaspIndexedTx;
 use shared::retry;
 use shared::transaction::Transaction;
 use tendermint_rpc::HttpClient;
@@ -54,8 +56,11 @@ async fn main() -> Result<(), MainError> {
 
     run_migrations(&app_state).await?;
 
-    let (last_block_height, commitment_tree, witness_map) =
+    let (last_block_height, mut commitment_tree, mut witness_map) =
         load_committed_state(&app_state, starting_block_height).await?;
+
+    let mut tx_notes_index = TxNoteMap::default();
+    let mut shielded_txs = BTreeMap::new();
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
@@ -85,8 +90,6 @@ async fn main() -> Result<(), MainError> {
             retry_interval,
             async || {
                 let client = client.clone();
-                let witness_map = witness_map.clone();
-                let commitment_tree = commitment_tree.clone();
                 let app_state = app_state.clone();
                 let chain_state = ChainState::new(block_height);
 
@@ -94,8 +97,10 @@ async fn main() -> Result<(), MainError> {
                     block_height,
                     &exit_handle,
                     client,
-                    witness_map,
-                    commitment_tree,
+                    &mut witness_map,
+                    &mut commitment_tree,
+                    &mut tx_notes_index,
+                    &mut shielded_txs,
                     app_state,
                     chain_state,
                     number_of_witness_map_roots_to_check,
@@ -224,8 +229,10 @@ async fn build_and_commit_masp_data_at_height(
     block_height: BlockHeight,
     exit_handle: &AtomicBool,
     client: Arc<HttpClient>,
-    witness_map: WitnessMap,
-    commitment_tree: CommitmentTree,
+    witness_map: &mut WitnessMap,
+    commitment_tree: &mut CommitmentTree,
+    tx_notes_index: &mut TxNoteMap,
+    shielded_txs: &mut BTreeMap<MaspIndexedTx, MaspTransaction>,
     app_state: AppState,
     chain_state: ChainState,
     number_of_witness_map_roots_to_check: usize,
@@ -237,6 +244,8 @@ async fn build_and_commit_masp_data_at_height(
     // NB: rollback changes from previous failed commit attempts
     witness_map.rollback();
     commitment_tree.rollback();
+    tx_notes_index.clear();
+    shielded_txs.clear();
 
     let conn_obj = app_state.get_db_connection().await.into_db_error()?;
 
@@ -267,9 +276,6 @@ async fn build_and_commit_masp_data_at_height(
         (block_data, num_transactions)
     };
 
-    let mut shielded_txs = BTreeMap::new();
-    let mut tx_notes_index = TxNoteMap::default();
-
     tracing::info!(
         %block_height,
         num_transactions,
@@ -280,9 +286,9 @@ async fn build_and_commit_masp_data_at_height(
         block_data.transactions.into_iter()
     {
         masp_service::update_witness_map(
-            &commitment_tree,
-            &mut tx_notes_index,
-            &witness_map,
+            commitment_tree,
+            tx_notes_index,
+            witness_map,
             masp_indexed_tx,
             &masp_tx,
         )
@@ -303,8 +309,8 @@ async fn build_and_commit_masp_data_at_height(
     validate_masp_state(
         &mut checkpoint,
         &client,
-        &commitment_tree,
-        &witness_map,
+        commitment_tree,
+        witness_map,
         number_of_witness_map_roots_to_check,
     )
     .await?;
@@ -318,7 +324,6 @@ async fn build_and_commit_masp_data_at_height(
         tx_notes_index,
         shielded_txs,
     )
-    .await
     .into_db_error()?;
 
     Ok(())
@@ -344,11 +349,18 @@ async fn validate_masp_state(
             .into_rpc_error()
         };
 
-        let witness_map = witness_map.clone();
+        // SAFETY: Artificially extend the lifetime of `witness_map`
+        // to be able to pass it to `tokio::task::spawn_blocking`.
+        // The reference does not escape its intended scope,
+        // therefore the `'static`, in spite of being
+        // somewhat sketchy, is safe.
+        let witness_map: &'static WitnessMap =
+            unsafe { std::mem::transmute(witness_map) };
+
         let witness_map_check_fut = async move {
             tokio::task::spawn_blocking(move || {
                 masp_service::query_witness_map_anchor_existence(
-                    &witness_map,
+                    witness_map,
                     tree_root,
                     number_of_witness_map_roots_to_check,
                 )
