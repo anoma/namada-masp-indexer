@@ -9,6 +9,7 @@ pub mod height;
 pub mod id;
 pub mod indexed_tx;
 pub mod retry;
+pub mod throughput;
 pub mod transaction;
 pub mod transactional;
 pub mod tx_index;
