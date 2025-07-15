@@ -17,6 +17,9 @@ pub struct AppConfig {
     pub starting_block_height: Option<u64>,
 
     #[clap(long, env, default_value_t = 0)]
+    pub max_concurrent_fetches: usize,
+
+    #[clap(long, env, default_value_t = 0)]
     pub number_of_witness_map_roots_to_check: usize,
 
     #[command(flatten)]

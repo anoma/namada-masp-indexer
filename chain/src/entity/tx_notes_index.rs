@@ -15,32 +15,38 @@ impl TxNoteMap {
         self.0.is_empty()
     }
 
-    pub fn into_db(&self) -> Vec<NotesIndexInsertDb> {
-        self.0
-            .iter()
-            .map(
-                |(
-                    &MaspIndexedTx {
-                        indexed_tx:
-                            IndexedTx {
-                                block_height,
-                                block_index,
-                                masp_tx_index,
-                            },
-                        kind,
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    pub fn into_db(&mut self) -> Vec<NotesIndexInsertDb> {
+        let mut output = Vec::with_capacity(self.0.len());
+
+        while let Some((
+            MaspIndexedTx {
+                indexed_tx:
+                    IndexedTx {
+                        block_height,
+                        block_index,
+                        masp_tx_index,
                     },
-                    &note_pos,
-                )| NotesIndexInsertDb {
-                    block_index: block_index.0 as i32,
-                    note_position: note_pos as i32,
-                    block_height: block_height.0 as i32,
-                    masp_tx_index: masp_tx_index.0 as i32,
-                    is_masp_fee_payment: matches!(
-                        kind,
-                        shared::indexed_tx::MaspTxKind::FeePayment
-                    ),
-                },
-            )
-            .collect()
+                kind,
+            },
+            note_pos,
+        )) = self.0.pop_first()
+        {
+            output.push(NotesIndexInsertDb {
+                block_index: block_index.0 as i32,
+                note_position: note_pos as i32,
+                block_height: block_height.0 as i32,
+                masp_tx_index: masp_tx_index.0 as i32,
+                is_masp_fee_payment: matches!(
+                    kind,
+                    shared::indexed_tx::MaspTxKind::FeePayment
+                ),
+            });
+        }
+
+        output
     }
 }

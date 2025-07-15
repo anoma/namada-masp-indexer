@@ -5,20 +5,25 @@ pub mod services;
 
 use std::collections::BTreeMap;
 use std::env;
+use std::future::poll_fn;
 use std::ops::ControlFlow;
 use std::sync::Arc;
-use std::sync::atomic::{self, AtomicBool};
+use std::task::Poll;
 use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
+use namada_sdk::masp_primitives::transaction::Transaction as MaspTransaction;
+use shared::block::Block;
 use shared::error::{IntoMainError, MainError};
-use shared::height::{BlockHeight, FollowingHeights};
-use shared::retry;
+use shared::height::{BlockHeight, FollowingHeights, UnprocessedBlocks};
+use shared::indexed_tx::MaspIndexedTx;
 use shared::transaction::Transaction;
+use shared::{exit_handle, retry};
 use tendermint_rpc::HttpClient;
 use tendermint_rpc::client::CompatMode;
 use tokio::signal;
+use tokio::sync::{Semaphore, mpsc};
 use tokio::time::{Instant, sleep};
 
 use crate::appstate::AppState;
@@ -32,7 +37,9 @@ use crate::services::{
 };
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
+
 const DEFAULT_INTERVAL: u64 = 5;
+const DEFAULT_MAX_CONCURRENT_FETCHES: usize = 100;
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
@@ -43,25 +50,28 @@ async fn main() -> Result<(), MainError> {
         verbosity,
         starting_block_height,
         number_of_witness_map_roots_to_check,
+        max_concurrent_fetches,
     } = AppConfig::parse();
 
     config::install_tracing_subscriber(verbosity);
 
     tracing::info!(version = VERSION_STRING, "Started the namada-masp-indexer");
-    let exit_handle = must_exit_handle();
+    spawn_exit_handler();
 
     let app_state = AppState::new(database_url).await.into_db_error()?;
 
     run_migrations(&app_state).await?;
 
-    let (last_block_height, commitment_tree, witness_map) =
+    let (last_block_height, mut commitment_tree, mut witness_map) =
         load_committed_state(&app_state, starting_block_height).await?;
+
+    let mut tx_notes_index = TxNoteMap::default();
+    let mut shielded_txs = BTreeMap::new();
 
     let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
         .compat_mode(CompatMode::V0_37)
         .build()
         .unwrap();
-    let client = Arc::new(client);
 
     let retry_interval = Duration::from_millis(
         interval
@@ -69,72 +79,170 @@ async fn main() -> Result<(), MainError> {
             .unwrap_or(DEFAULT_INTERVAL * 1000),
     );
 
-    let mut heights_to_process = FollowingHeights::after(last_block_height);
+    let mut fetched_blocks = fetch_blocks_and_get_handle(
+        last_block_height,
+        max_concurrent_fetches,
+        retry_interval,
+        client.clone(),
+    );
 
-    while let Some(block_height) = heights_to_process
-        .next_height(&client, retry_interval, || must_exit(&exit_handle))
-        .await
-        .into_rpc_error()?
+    let mut unprocessed_blocks = UnprocessedBlocks::new(last_block_height);
+
+    while let Some(block_data) =
+        get_new_block_from_fetcher(&mut fetched_blocks).await
     {
-        if must_exit(&exit_handle) {
-            break;
+        let received_block_height = block_data.header.height;
+
+        // Sort the fetched block
+        let Some(block_data) = unprocessed_blocks.next_to_process(block_data)
+        else {
+            tracing::info!(%received_block_height, "Queueing block to be processed");
+            continue;
+        };
+
+        // Check if we can skip committing this block for now.
+        // This is because the block is empty. We can make a
+        // single remote procedure call to Postgres, when we
+        // exit.
+        if unprocessed_blocks.pre_commit_check_if_skip(&block_data) {
+            tracing::info!(block_height = %block_data.header.height, "Skipping commit of empty block");
+            continue;
         }
 
-        // Build and commit MASP data at the block height
-        if let ControlFlow::Break(()) = retry::every(
-            retry_interval,
-            async || {
-                let client = client.clone();
-                let witness_map = witness_map.clone();
-                let commitment_tree = commitment_tree.clone();
-                let app_state = app_state.clone();
-                let chain_state = ChainState::new(block_height);
+        tracing::info!(block_height = %block_data.header.height, "Dequeued block to be processed");
 
+        // Build and commit MASP data at the block height
+        if let ControlFlow::Break(()) =
+            retry::every(retry_interval, async || {
                 build_and_commit_masp_data_at_height(
-                    block_height,
-                    &exit_handle,
-                    client,
-                    witness_map,
-                    commitment_tree,
-                    app_state,
-                    chain_state,
+                    block_data.clone(),
+                    &client,
+                    &mut witness_map,
+                    &mut commitment_tree,
+                    &mut tx_notes_index,
+                    &mut shielded_txs,
+                    &app_state,
                     number_of_witness_map_roots_to_check,
                 )
                 .await
-            },
-            async |_| {
-                if must_exit(&exit_handle) {
-                    ControlFlow::Break(())
-                } else {
-                    ControlFlow::Continue(())
-                }
-            },
-        )
-        .await
+            })
+            .await
         {
             break;
         }
     }
 
+    if let Some(block_data) = unprocessed_blocks.finalize() {
+        tracing::warn!(
+            block_height = %block_data.header.height,
+            "Single attempt at commiting data to db just before exiting"
+        );
+
+        // Make a feeble attempt at committing before exiting
+        // for good
+        build_and_commit_masp_data_at_height(
+            block_data.clone(),
+            &client,
+            &mut witness_map,
+            &mut commitment_tree,
+            &mut tx_notes_index,
+            &mut shielded_txs,
+            &app_state,
+            number_of_witness_map_roots_to_check,
+        )
+        .await?;
+    }
+
     Ok(())
 }
 
-#[inline]
-fn must_exit(handle: &AtomicBool) -> bool {
-    handle.load(atomic::Ordering::Relaxed)
+fn fetch_blocks_and_get_handle(
+    last_block_height: Option<BlockHeight>,
+    max_concurrent_fetches: usize,
+    retry_interval: Duration,
+    client: HttpClient,
+) -> mpsc::UnboundedReceiver<Block> {
+    let (tx, rx) = mpsc::unbounded_channel();
+
+    tokio::spawn(async move {
+        let mut heights_to_process = FollowingHeights::after(last_block_height);
+
+        let sem = Arc::new(Semaphore::new(if max_concurrent_fetches == 0 {
+            DEFAULT_MAX_CONCURRENT_FETCHES
+        } else {
+            max_concurrent_fetches
+        }));
+
+        while let Some(block_height) = heights_to_process
+            .next_height(&client, retry_interval)
+            .await
+        {
+            let permit = sem
+                .clone()
+                .acquire_owned()
+                .await
+                .expect("Failed to acquire semaphore handle");
+
+            let client = client.clone();
+            let tx = tx.clone();
+
+            tokio::spawn(async move {
+                let _permit = permit;
+
+                let ControlFlow::Continue(block_data) =
+                    retry::every(retry_interval, async move || {
+                        let mut checkpoint = Instant::now();
+
+                        tracing::info!(
+                            %block_height,
+                            "Fetching block data from CometBFT"
+                        );
+
+                        let block_data =
+                            cometbft_service::query_masp_txs_in_block(
+                                &client,
+                                block_height,
+                            )
+                            .await?;
+
+                        with_time_taken(&mut checkpoint, |time_taken| {
+                            tracing::info!(
+                                time_taken,
+                                %block_height,
+                                "Acquired block data from CometBFT"
+                            );
+                        });
+
+                        anyhow::Ok(block_data)
+                    })
+                    .await
+                else {
+                    return;
+                };
+
+                match tx.send(block_data) {
+                    Err(_) if exit_handle::must_exit() => {}
+                    Err(err) => panic!(
+                        "Block data consumer has terminated unexpectedly: \
+                         {err}"
+                    ),
+                    _ => {}
+                }
+            });
+        }
+    });
+
+    rx
 }
 
-fn must_exit_handle() -> Arc<AtomicBool> {
-    let handle = Arc::new(AtomicBool::new(false));
-    let task_handle = Arc::clone(&handle);
+fn spawn_exit_handler() {
     tokio::spawn(async move {
         signal::ctrl_c()
             .await
             .expect("Error receiving interrupt signal");
         tracing::info!("Ctrl-c received");
-        task_handle.store(true, atomic::Ordering::Relaxed);
+        exit_handle::exit();
     });
-    handle
 }
 
 async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
@@ -156,7 +264,7 @@ async fn run_migrations(app_state: &AppState) -> Result<(), MainError> {
             }
             Err(e) => {
                 tracing::debug!(
-                    "Failed runnign migrations: {} ({}/5)",
+                    "Failed running migrations: {} ({}/5)",
                     e.to_string(),
                     max_retries
                 );
@@ -221,68 +329,41 @@ async fn load_committed_state(
 
 #[allow(clippy::too_many_arguments)]
 async fn build_and_commit_masp_data_at_height(
-    block_height: BlockHeight,
-    exit_handle: &AtomicBool,
-    client: Arc<HttpClient>,
-    witness_map: WitnessMap,
-    commitment_tree: CommitmentTree,
-    app_state: AppState,
-    chain_state: ChainState,
+    block_data: Block,
+    client: &HttpClient,
+    witness_map: &mut WitnessMap,
+    commitment_tree: &mut CommitmentTree,
+    tx_notes_index: &mut TxNoteMap,
+    shielded_txs: &mut BTreeMap<MaspIndexedTx, MaspTransaction>,
+    app_state: &AppState,
     number_of_witness_map_roots_to_check: usize,
 ) -> Result<(), MainError> {
-    if must_exit(exit_handle) {
-        return Ok(());
-    }
-
     // NB: rollback changes from previous failed commit attempts
     witness_map.rollback();
     commitment_tree.rollback();
+    tx_notes_index.clear();
+    shielded_txs.clear();
 
     let conn_obj = app_state.get_db_connection().await.into_db_error()?;
 
-    tracing::info!(
-        %block_height,
-        "Attempting to process new block"
-    );
-
     let mut checkpoint = Instant::now();
 
-    let (block_data, num_transactions) = {
-        tracing::info!(
-            %block_height,
-            "Fetching block data from CometBFT"
-        );
-        let block_data =
-            cometbft_service::query_masp_txs_in_block(&client, block_height)
-                .await
-                .into_rpc_error()?;
-        with_time_taken(&mut checkpoint, |time_taken| {
-            tracing::info!(
-                time_taken,
-                %block_height,
-                "Acquired block data from CometBFT"
-            );
-        });
-        let num_transactions = block_data.transactions.len();
-        (block_data, num_transactions)
-    };
-
-    let mut shielded_txs = BTreeMap::new();
-    let mut tx_notes_index = TxNoteMap::default();
+    let num_transactions = block_data.transactions.len();
+    let block_height = block_data.header.height;
 
     tracing::info!(
         %block_height,
         num_transactions,
-        "Processing new masp transactions...",
+        "Attempting to process new masp transactions..."
     );
 
     for (masp_indexed_tx, Transaction { masp_tx, .. }) in
         block_data.transactions.into_iter()
     {
         masp_service::update_witness_map(
-            &commitment_tree,
-            &mut tx_notes_index,
-            &witness_map,
+            commitment_tree,
+            tx_notes_index,
+            witness_map,
             masp_indexed_tx,
             &masp_tx,
         )
@@ -302,12 +383,14 @@ async fn build_and_commit_masp_data_at_height(
 
     validate_masp_state(
         &mut checkpoint,
-        &client,
-        &commitment_tree,
-        &witness_map,
+        client,
+        commitment_tree,
+        witness_map,
         number_of_witness_map_roots_to_check,
     )
     .await?;
+
+    let chain_state = ChainState::new(block_data.header.height);
 
     db_service::commit(
         &mut checkpoint,
@@ -318,7 +401,6 @@ async fn build_and_commit_masp_data_at_height(
         tx_notes_index,
         shielded_txs,
     )
-    .await
     .into_db_error()?;
 
     Ok(())
@@ -344,11 +426,18 @@ async fn validate_masp_state(
             .into_rpc_error()
         };
 
-        let witness_map = witness_map.clone();
+        // SAFETY: Artificially extend the lifetime of `witness_map`
+        // to be able to pass it to `tokio::task::spawn_blocking`.
+        // The reference does not escape its intended scope,
+        // therefore the `'static`, in spite of being
+        // somewhat sketchy, is safe.
+        let witness_map: &'static WitnessMap =
+            unsafe { std::mem::transmute(witness_map) };
+
         let witness_map_check_fut = async move {
             tokio::task::spawn_blocking(move || {
                 masp_service::query_witness_map_anchor_existence(
-                    &witness_map,
+                    witness_map,
                     tree_root,
                     number_of_witness_map_roots_to_check,
                 )
@@ -367,6 +456,24 @@ async fn validate_masp_state(
     }
 
     Ok(())
+}
+
+async fn get_new_block_from_fetcher(
+    blocks: &mut mpsc::UnboundedReceiver<Block>,
+) -> Option<Block> {
+    poll_fn(|cx| {
+        if exit_handle::must_exit() {
+            return Poll::Ready(None);
+        }
+
+        match blocks.poll_recv(cx) {
+            Poll::Ready(None) => {
+                panic!("The block fetching task has unexpectedly terminated")
+            }
+            poll => poll,
+        }
+    })
+    .await
 }
 
 fn with_time_taken<F, T>(checkpoint: &mut Instant, callback: F) -> T

@@ -9,9 +9,9 @@ use crate::entity::tx_notes_index::TxNoteMap;
 use crate::entity::witness_map::WitnessMap;
 
 pub fn update_witness_map(
-    commitment_tree: &CommitmentTree,
+    commitment_tree: &mut CommitmentTree,
     tx_notes_index: &mut TxNoteMap,
-    witness_map: &WitnessMap,
+    witness_map: &mut WitnessMap,
     indexed_tx: MaspIndexedTx,
     shielded: &namada_core::masp_primitives::transaction::Transaction,
 ) -> anyhow::Result<()> {
