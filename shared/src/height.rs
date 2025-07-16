@@ -155,6 +155,12 @@ impl From<BlockHeight> for Height {
     }
 }
 
+impl From<BlockHeight> for u64 {
+    fn from(value: BlockHeight) -> u64 {
+        value.0
+    }
+}
+
 impl From<Height> for BlockHeight {
     fn from(value: Height) -> Self {
         Self(value.into())

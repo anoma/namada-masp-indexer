@@ -18,6 +18,7 @@ use shared::block::Block;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights, UnprocessedBlocks};
 use shared::indexed_tx::MaspIndexedTx;
+use shared::throughput::Throughput;
 use shared::transaction::Transaction;
 use shared::{exit_handle, retry};
 use tendermint_rpc::HttpClient;
@@ -38,8 +39,14 @@ use crate::services::{
 
 const VERSION_STRING: &str = env!("VERGEN_GIT_SHA");
 
-const DEFAULT_INTERVAL: u64 = 5;
+const DEFAULT_RETRY_INTERVAL: u64 = 5;
 const DEFAULT_MAX_CONCURRENT_FETCHES: usize = 100;
+const DEFAULT_THROUGHPUT_AVG_PERIOD: u64 = 100;
+
+struct ThroughputMetrics {
+    fetching: Throughput,
+    processing: Throughput,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
@@ -76,7 +83,7 @@ async fn main() -> Result<(), MainError> {
     let retry_interval = Duration::from_millis(
         interval
             .map(|millis| millis * 1000)
-            .unwrap_or(DEFAULT_INTERVAL * 1000),
+            .unwrap_or(DEFAULT_RETRY_INTERVAL * 1000),
     );
 
     let mut fetched_blocks = fetch_blocks_and_get_handle(
@@ -88,9 +95,26 @@ async fn main() -> Result<(), MainError> {
 
     let mut unprocessed_blocks = UnprocessedBlocks::new(last_block_height);
 
+    let mut throughput = ThroughputMetrics {
+        fetching: Throughput::new(
+            DEFAULT_THROUGHPUT_AVG_PERIOD,
+            last_block_height,
+        ),
+        processing: Throughput::new(
+            DEFAULT_THROUGHPUT_AVG_PERIOD,
+            last_block_height,
+        ),
+    };
+
     while let Some(block_data) =
         get_new_block_from_fetcher(&mut fetched_blocks).await
     {
+        tracing::info!(
+            blocks_per_second =
+                ?throughput.fetching.throughput_per_second(None::<u64>),
+            "Current fetching throughput"
+        );
+
         let received_block_height = block_data.header.height;
 
         // Sort the fetched block
@@ -99,6 +123,13 @@ async fn main() -> Result<(), MainError> {
             tracing::info!(%received_block_height, "Queueing block to be processed");
             continue;
         };
+
+        tracing::info!(
+            blocks_per_second = ?throughput
+                .processing
+                .throughput_per_second(Some(block_data.header.height)),
+            "Current processing throughput"
+        );
 
         // Check if we can skip committing this block for now.
         // This is because the block is empty. We can make a
