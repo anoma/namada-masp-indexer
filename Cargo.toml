@@ -46,3 +46,4 @@ tryhard = { version = "0.5.1" }
 validator = { version = "0.16.0", features = ["derive"] }
 vergen = "8.0.0"
 xorf = { version = "0.11.0", features = ["serde"]}
+reqwest = { version = "0.11.27", features = ["json", "cookies"] }

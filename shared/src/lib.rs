@@ -1,5 +1,6 @@
 pub mod block;
 pub mod block_results;
+pub mod client;
 pub mod commitment_tree;
 pub mod error;
 pub mod exit_handle;

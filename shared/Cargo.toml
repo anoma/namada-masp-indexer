@@ -23,3 +23,4 @@ tendermint-rpc.workspace = true
 tendermint.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+reqwest.workspace = true
