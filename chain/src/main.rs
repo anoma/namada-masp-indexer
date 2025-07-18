@@ -15,13 +15,13 @@ use anyhow::Context;
 use clap::Parser;
 use namada_sdk::masp_primitives::transaction::Transaction as MaspTransaction;
 use shared::block::Block;
+use shared::client::Client;
 use shared::error::{IntoMainError, MainError};
 use shared::height::{BlockHeight, FollowingHeights, UnprocessedBlocks};
 use shared::indexed_tx::MaspIndexedTx;
 use shared::transaction::Transaction;
 use shared::{exit_handle, retry};
 use tendermint_rpc::HttpClient;
-use tendermint_rpc::client::CompatMode;
 use tokio::signal;
 use tokio::sync::{Semaphore, mpsc};
 use tokio::time::{Instant, sleep};
@@ -68,10 +68,7 @@ async fn main() -> Result<(), MainError> {
     let mut tx_notes_index = TxNoteMap::default();
     let mut shielded_txs = BTreeMap::new();
 
-    let client = HttpClient::builder(cometbft_url.as_str().parse().unwrap())
-        .compat_mode(CompatMode::V0_37)
-        .build()
-        .unwrap();
+    let client = Client::new(&cometbft_url);
 
     let retry_interval = Duration::from_millis(
         interval
@@ -83,7 +80,7 @@ async fn main() -> Result<(), MainError> {
         last_block_height,
         max_concurrent_fetches,
         retry_interval,
-        client.clone(),
+        client.get(),
     );
 
     let mut unprocessed_blocks = UnprocessedBlocks::new(last_block_height);
@@ -116,7 +113,7 @@ async fn main() -> Result<(), MainError> {
             retry::every(retry_interval, async || {
                 build_and_commit_masp_data_at_height(
                     block_data.clone(),
-                    &client,
+                    client.as_ref(),
                     &mut witness_map,
                     &mut commitment_tree,
                     &mut tx_notes_index,
@@ -142,7 +139,7 @@ async fn main() -> Result<(), MainError> {
         // for good
         build_and_commit_masp_data_at_height(
             block_data.clone(),
-            &client,
+            client.as_ref(),
             &mut witness_map,
             &mut commitment_tree,
             &mut tx_notes_index,
