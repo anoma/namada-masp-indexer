@@ -464,6 +464,7 @@ async fn get_new_block_from_fetcher(
         }
 
         match blocks.poll_recv(cx) {
+            poll @ Poll::Ready(None) if exit_handle::must_exit() => poll,
             Poll::Ready(None) => {
                 panic!("The block fetching task has unexpectedly terminated")
             }
