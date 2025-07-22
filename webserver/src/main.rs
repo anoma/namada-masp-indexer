@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Arc::new(AppConfig::parse());
 
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .init();
 
     ApplicationServer::serve(config).await
